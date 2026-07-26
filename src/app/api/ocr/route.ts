@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { Client, Databases } from 'node-appwrite';
+import { rateLimit } from '@/utils/rateLimit';
+import { logger } from '@/utils/logger';
+
+// Type definitions for OpenAI vision payload
+type MessageContentText = { type: 'text'; text: string };
+type MessageContentImage = { type: 'image_url'; image_url: { url: string } };
+type ContentPayload = MessageContentText | MessageContentImage;
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -12,6 +19,15 @@ const client = new Client()
     .setKey(process.env.APPWRITE_API_KEY!);
 
 export async function POST(req: NextRequest) {
+  const ip = req.headers.get('x-forwarded-for') ?? req.ip ?? 'unknown';
+  
+  // Rate Limit: 5 requests per minute
+  const limit = rateLimit(ip, 5, 60 * 1000);
+  if (!limit.success) {
+    logger.warn('OCR_API', 'Rate limit exceeded', { ip });
+    return NextResponse.json({ error: 'Terlalu banyak permintaan. Silakan coba beberapa saat lagi.' }, { status: 429 });
+  }
+
   try {
     const body = await req.json();
     const images: string[] = body.images; // array of base64 data URIs
@@ -35,11 +51,11 @@ export async function POST(req: NextRequest) {
 Anda WAJIB menggunakan ejaan dan format nama desa beserta kecamatannya PERSIS seperti salah satu dari daftar referensi resmi berikut ini (Dilarang mengarang atau menggabungkan nama sendiri):
 [${daftarNama}]`;
     } catch (e) {
-      console.error('Gagal mengambil referensi desa:', e);
+      logger.error('OCR_API', 'Gagal mengambil referensi desa', e);
     }
 
     // Bangun payload pesan
-    const contentPayload: any[] = [{ 
+    const contentPayload: ContentPayload[] = [{ 
       type: 'text', 
       text: `Anda adalah asisten AI pengekstraksi data finansial desa berakurasi tinggi.
 Tugas Anda adalah membaca gambar/dokumen yang diunggah dan menghasilkan JSON murni dengan format berikut:
@@ -90,8 +106,13 @@ Aturan Ekstraksi:
 
     // AI Classification Protection
     if (jsonData.error_tipe_dokumen && jsonData.error_tipe_dokumen.trim() !== '') {
+      logger.warn('OCR_API', 'Dokumen ditolak oleh AI', { reason: jsonData.error_tipe_dokumen });
       return NextResponse.json({ error: jsonData.error_tipe_dokumen }, { status: 400 });
     }
+
+    logger.info('OCR_API', 'Berhasil mengekstrak data OCR', { 
+      desaCount: jsonData.data?.length || 0 
+    });
 
     return NextResponse.json({ 
       success: true, 
@@ -100,8 +121,9 @@ Aturan Ekstraksi:
       metadata_no_surat: jsonData.metadata_no_surat || '',
       data: jsonData.data || [] 
     });
-  } catch (error: any) {
-    console.error('OCR Error:', error);
-    return NextResponse.json({ error: error.message || 'Server Error' }, { status: 500 });
+  } catch (error: unknown) {
+    logger.error('OCR_API', 'OCR Server Error', error);
+    const message = error instanceof Error ? error.message : 'Server Error';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

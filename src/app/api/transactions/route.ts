@@ -1,5 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Client, Databases, Query, ID } from 'node-appwrite';
+import { logger } from '@/utils/logger';
+
+interface TransactionItem {
+  nama_desa: string;
+  kegiatan: string;
+  nominal: number;
+  no_rekening: string;
+}
+
+// Fungsi sederhana untuk menghitung Jarak Levenshtein
+const levenshtein = (a: string, b: string) => {
+  const matrix = Array.from({ length: a.length + 1 }, () => Array(b.length + 1).fill(0));
+  for (let i = 0; i <= a.length; i++) matrix[i][0] = i;
+  for (let j = 0; j <= b.length; j++) matrix[0][j] = j;
+  for (let i = 1; i <= a.length; i++) {
+    for (let j = 1; j <= b.length; j++) {
+      if (a[i - 1] === b[j - 1]) matrix[i][j] = matrix[i - 1][j - 1];
+      else matrix[i][j] = Math.min(matrix[i - 1][j - 1], matrix[i][j - 1], matrix[i - 1][j]) + 1;
+    }
+  }
+  return matrix[a.length][b.length];
+};
 
 const client = new Client()
     .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT!)
@@ -24,49 +46,32 @@ export async function POST(req: NextRequest) {
     const results = [];
     const errors = [];
 
-    // Proses simpan data (Batch/Sequential)
-    for (const item of data) {
-      try {
-        // 1. Parsing Nama Desa & Kecamatan dari teks OCR (Contoh: "Panican Kec. Kemangkon")
-        const parts = item.nama_desa.split(/ Kec\. /i);
-        const namaDesaAsli = parts[0].trim().toUpperCase();
-        const namaKecamatan = parts.length > 1 ? parts[1].trim().toUpperCase() : '';
+    // Proses simpan data (Parallel)
+    const promises = data.map(async (item: TransactionItem) => {
+      // 1. Parsing Nama Desa & Kecamatan dari teks OCR (Contoh: "Panican Kec. Kemangkon")
+      const parts = item.nama_desa.split(/ Kec\. /i);
+      const namaDesaAsli = parts[0].trim().toUpperCase();
+      const namaKecamatan = parts.length > 1 ? parts[1].trim().toUpperCase() : '';
 
-        // Gunakan pencarian EXACT match pertama kali
-        const exactQueries = [Query.equal('nama_desa', namaDesaAsli)];
-        if (namaKecamatan) exactQueries.push(Query.equal('kecamatan', namaKecamatan));
-        
-        let desaQuery = await databases.listDocuments(DB_ID, 'master_desa', exactQueries);
-        let matchedDesa = desaQuery.total > 0 ? desaQuery.documents[0] : null;
+      // Gunakan pencarian EXACT match pertama kali
+      const exactQueries = [Query.equal('nama_desa', namaDesaAsli)];
+      if (namaKecamatan) exactQueries.push(Query.equal('kecamatan', namaKecamatan));
+      
+      const desaQuery = await databases.listDocuments(DB_ID, 'master_desa', exactQueries);
+      let matchedDesa = desaQuery.total > 0 ? desaQuery.documents[0] : null;
 
-        // FALLBACK: Fuzzy Match Sebenarnya (Levenshtein Distance)
-        // Jika EXACT gagal (biasanya karena typo OCR seperti "Kailialang" -> "Kalialang"), 
-        // kita ambil semua desa di kecamatan tersebut dan cari kemiripan tertinggi!
-        if (!matchedDesa && namaKecamatan) {
-          const kecQuery = await databases.listDocuments(DB_ID, 'master_desa', [
-            Query.equal('kecamatan', namaKecamatan),
-            Query.limit(50) // Ambil semua desa di kecamatan itu
-          ]);
+      // FALLBACK: Fuzzy Match Sebenarnya (Levenshtein Distance)
+      if (!matchedDesa && namaKecamatan) {
+        const kecQuery = await databases.listDocuments(DB_ID, 'master_desa', [
+          Query.equal('kecamatan', namaKecamatan),
+          Query.limit(50) // Ambil semua desa di kecamatan itu
+        ]);
 
-          let bestMatch = null;
-          let minDistance = 999;
+        let bestMatch = null;
+        let minDistance = 999;
 
-          // Fungsi sederhana untuk menghitung Jarak Levenshtein
-          const levenshtein = (a, b) => {
-            const matrix = Array.from({ length: a.length + 1 }, () => Array(b.length + 1).fill(0));
-            for (let i = 0; i <= a.length; i++) matrix[i][0] = i;
-            for (let j = 0; j <= b.length; j++) matrix[0][j] = j;
-            for (let i = 1; i <= a.length; i++) {
-              for (let j = 1; j <= b.length; j++) {
-                if (a[i - 1] === b[j - 1]) matrix[i][j] = matrix[i - 1][j - 1];
-                else matrix[i][j] = Math.min(matrix[i - 1][j - 1], matrix[i][j - 1], matrix[i - 1][j]) + 1;
-              }
-            }
-            return matrix[a.length][b.length];
-          };
-
-          for (const d of kecQuery.documents) {
-            const dist = levenshtein(namaDesaAsli, d.nama_desa);
+        for (const d of kecQuery.documents) {
+          const dist = levenshtein(namaDesaAsli, d.nama_desa);
             // Toleransi typo: maksimal 3 huruf salah, atau kemiripan sangat tinggi
             if (dist < minDistance && dist <= 3) {
               minDistance = dist;
@@ -113,26 +118,44 @@ export async function POST(req: NextRequest) {
           }
         }
 
-        // 4. Simpan sebagai Transaksi Pencairan (Draft)
-        const transaksi = await databases.createDocument(
-          DB_ID, 
-          'transaksi_pencairan', 
-          ID.unique(),
-          {
-            tahap_ke: "Rekomendasi Scanner", 
-            nominal_pencairan_net: item.nominal,
-            keterangan: item.kegiatan,
-            status_verifikasi: "DRAFT",
-            pagu: paguId,
-            no_rekomendasi: no_surat || ''
-          }
-        );
+      // 4. Simpan sebagai Transaksi Pencairan (Draft)
+      const transaksi = await databases.createDocument(
+        DB_ID, 
+        'transaksi_pencairan', 
+        ID.unique(),
+        {
+          tahap_ke: "Rekomendasi Scanner", 
+          nominal_pencairan_net: item.nominal,
+          keterangan: item.kegiatan,
+          status_verifikasi: "DRAFT",
+          pagu: paguId,
+          no_rekomendasi: no_surat || ''
+        }
+      );
 
-        results.push(transaksi);
-      } catch (err: any) {
-        errors.push({ nama_desa: item.nama_desa, reason: err.message });
+      return transaksi;
+    });
+
+    const settledResults = await Promise.allSettled(promises);
+
+    const errors: { nama_desa: string, reason: string }[] = [];
+    const results: unknown[] = [];
+
+    settledResults.forEach((res, index) => {
+      if (res.status === 'fulfilled') {
+        results.push(res.value);
+      } else {
+        const item = data[index] as TransactionItem;
+        errors.push({ 
+          nama_desa: item.nama_desa || 'Unknown', 
+          reason: res.reason instanceof Error ? res.reason.message : String(res.reason) 
+        });
       }
-    }
+    });
+
+    logger.info('TRANSACTIONS_API', 'Berhasil memproses transaksi batch', { 
+      saved: results.length, failed: errors.length 
+    });
 
     return NextResponse.json({ 
       success: true, 
@@ -141,8 +164,9 @@ export async function POST(req: NextRequest) {
       errors 
     });
 
-  } catch (error: any) {
-    console.error('Save Error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error: unknown) {
+    logger.error('TRANSACTIONS_API', 'Save Error', error);
+    const message = error instanceof Error ? error.message : 'Server Error';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

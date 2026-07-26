@@ -10,6 +10,17 @@ interface ExtractedData {
   no_rekening: string;
 }
 
+interface SaveReportError {
+  nama_desa: string;
+  reason: string;
+}
+
+interface SaveReport {
+  saved: number;
+  failed: number;
+  errors: SaveReportError[];
+}
+
 export default function ScannerModule() {
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
@@ -22,7 +33,7 @@ export default function ScannerModule() {
   const [sumberDanaList, setSumberDanaList] = useState<{id: string, nama: string}[]>([]);
   const [selectedSumberDana, setSelectedSumberDana] = useState('');
   const [tahun, setTahun] = useState('2026');
-  const [saveReport, setSaveReport] = useState<{saved: number, failed: number, errors: any[]} | null>(null);
+  const [saveReport, setSaveReport] = useState<SaveReport | null>(null);
 
   useEffect(() => {
     const fetchSumberDana = async () => {
@@ -131,8 +142,12 @@ export default function ScannerModule() {
         }
       }
 
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError(String(err));
+      }
     } finally {
       setLoading(false);
       setStatusText('Mulai Ekstrak');
@@ -168,15 +183,19 @@ export default function ScannerModule() {
       // Partial Save Smart Filter:
       // Hanya sisakan data yang gagal di tabel agar bisa diperbaiki dan di-save ulang
       if (resData.errors && resData.errors.length > 0) {
-        const failedNames = resData.errors.map((e: any) => e.nama_desa);
+        const failedNames = resData.errors.map((e: SaveReportError) => e.nama_desa);
         setResults(prev => prev.filter(r => failedNames.includes(r.nama_desa)));
       } else {
         // Jika sukses semua, kosongkan tabel
         setResults([]);
       }
       
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError(String(err));
+      }
     } finally {
       setSaving(false);
     }
@@ -206,8 +225,9 @@ export default function ScannerModule() {
         <button
           onClick={handleUpload}
           disabled={!file || loading || saving}
-          className="px-6 py-2 bg-black dark:bg-white text-white dark:text-black font-semibold rounded-full disabled:opacity-50 hover:opacity-80 transition-opacity"
+          className="px-6 py-2 bg-black dark:bg-white text-white dark:text-black font-semibold rounded-full disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-80 transition-opacity flex items-center justify-center min-w-[150px]"
         >
+          {loading && <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-current" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>}
           {statusText}
         </button>
       </div>
@@ -228,7 +248,7 @@ export default function ScannerModule() {
             <div className="mt-2 text-sm">
               <p className="mb-2 font-medium text-red-800">Silakan koreksi ejaan desa di bawah ini langsung pada tabel, lalu tekan simpan kembali:</p>
               <ul className="text-xs text-red-700 list-disc list-inside bg-white/50 p-2 rounded">
-                {saveReport.errors.map((err: any, i: number) => (
+                {saveReport.errors.map((err: SaveReportError, i: number) => (
                   <li key={i}>{err.nama_desa}: {err.reason}</li>
                 ))}
               </ul>
@@ -245,7 +265,8 @@ export default function ScannerModule() {
               <select 
                 value={selectedSumberDana} 
                 onChange={e => setSelectedSumberDana(e.target.value)}
-                className="w-full p-2 border border-zinc-300 dark:border-zinc-600 rounded bg-white dark:bg-zinc-900 text-sm"
+                disabled={saving || loading}
+                className="w-full p-2 border border-zinc-300 dark:border-zinc-600 rounded bg-white dark:bg-zinc-900 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {sumberDanaList.map(s => (
                   <option key={s.id} value={s.id}>{s.nama}</option>
@@ -258,8 +279,9 @@ export default function ScannerModule() {
                 type="text" 
                 value={noSurat} 
                 onChange={e => setNoSurat(e.target.value)}
+                disabled={saving || loading}
                 placeholder="Contoh: 900/123/2026"
-                className="w-full p-2 border border-zinc-300 dark:border-zinc-600 rounded bg-white dark:bg-zinc-900 text-sm"
+                className="w-full p-2 border border-zinc-300 dark:border-zinc-600 rounded bg-white dark:bg-zinc-900 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
               />
             </div>
             <div className="w-32">
@@ -268,7 +290,8 @@ export default function ScannerModule() {
                 type="number" 
                 value={tahun} 
                 onChange={e => setTahun(e.target.value)}
-                className="w-full p-2 border border-zinc-300 dark:border-zinc-600 rounded bg-white dark:bg-zinc-900 text-sm"
+                disabled={saving || loading}
+                className="w-full p-2 border border-zinc-300 dark:border-zinc-600 rounded bg-white dark:bg-zinc-900 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
               />
             </div>
           </div>
@@ -293,7 +316,8 @@ export default function ScannerModule() {
                         value={row.nama_desa}
                         onChange={(e) => handleEditRow(i, 'nama_desa', e.target.value)}
                         title="Klik untuk mengedit secara manual jika ada salah ketik"
-                        className="w-full bg-transparent border-b border-transparent hover:border-zinc-300 focus:border-blue-500 focus:outline-none focus:bg-white dark:focus:bg-zinc-800 px-2 py-1 transition-colors"
+                        disabled={saving}
+                        className="w-full bg-transparent border-b border-transparent hover:border-zinc-300 focus:border-blue-500 focus:outline-none focus:bg-white dark:focus:bg-zinc-800 px-2 py-1 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                       />
                     </td>
                     <td className="px-4 py-3 text-zinc-500">{row.kegiatan}</td>
@@ -309,8 +333,9 @@ export default function ScannerModule() {
           <button 
             onClick={handleSaveToAppwrite}
             disabled={saving || !selectedSumberDana}
-            className="w-full py-3 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+            className="w-full py-3 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center"
           >
+            {saving && <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>}
             {saving ? 'Sedang Menyimpan ke Database...' : 'Konfirmasi & Simpan Transaksi ke Appwrite'}
           </button>
         </div>
