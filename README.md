@@ -1,36 +1,59 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# SIP-DADES-BAKEUDA
 
-## Getting Started
+Sistem Informasi Pengelolaan Dana Desa dan Bantuan Keuangan (SIP-DADES) untuk Badan Keuangan Daerah (Bakeuda) Kabupaten Purbalingga. 
 
-First, run the development server:
+Aplikasi web ini dibangun untuk mengotomatisasi dan mendigitalkan proses pencairan Alokasi Dana Desa (ADD) dan Bantuan Keuangan Khusus (BKK) yang sebelumnya dilakukan secara manual menggunakan Excel, kini terintegrasi dengan kecerdasan buatan (AI) untuk ekstraksi dokumen.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+## Arsitektur Sistem
+
+Sistem ini dirancang dengan pendekatan modern dan efisien biaya:
+
+- **Frontend & Backend**: [Next.js 14](https://nextjs.org/) (App Router) + Tailwind CSS
+- **Database & Autentikasi**: [Appwrite](https://appwrite.io/) (Backend-as-a-Service)
+- **AI OCR Engine**: GPU Serverless di [RunPod](https://runpod.io/) menjalankan **EasyOCR** untuk membaca hasil scan rekomendasi fisik (PDF/Gambar) dari Dinsospermasdes.
+
+## Persyaratan Lingkungan (Environment)
+
+Buat file `.env` di *root* proyek dan pastikan memuat kredensial berikut:
+
+```env
+# Konfigurasi Appwrite
+NEXT_PUBLIC_APPWRITE_ENDPOINT="https://sgp.cloud.appwrite.io/v1"
+NEXT_PUBLIC_APPWRITE_PROJECT_ID="your_project_id"
+NEXT_PUBLIC_APPWRITE_PROJECT_NAME="SIP-DADES-BAKEUDA"
+APPWRITE_API_KEY="your_secret_api_key"
+
+# Konfigurasi OCR RunPod Serverless
+RUNPOD_API_KEY="your_runpod_api_key"
+RUNPOD_ENDPOINT_ID="your_endpoint_id"
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Memulai Aplikasi (Local Development)
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Pastikan Node.js sudah terinstal, lalu jalankan perintah berikut:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+# Instalasi dependensi
+npm install
 
-## Learn More
+# Jalankan development server (berjalan di port 3005)
+npm run dev -- -p 3005
+```
 
-To learn more about Next.js, take a look at the following resources:
+Buka [http://localhost:3005](http://localhost:3005) pada browser Anda untuk mengakses aplikasi.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Struktur Direktori Utama
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- `/src/app` - Komponen Frontend UI (React) dan routing aplikasi.
+- `/src/app/api` - Next.js Route Handlers (Backend API) untuk komunikasi dengan Appwrite & OCR.
+- `/scripts` - Skrip utilitas (seperti inisialisasi/setup skema database Appwrite).
+- `ROADMAP.md` - Peta jalan (*roadmap*) pengembangan proyek dan SOP alur kerja.
 
-## Deploy on Vercel
+## Alur Kerja Utama (Workflow)
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+1. Staf pelaksana menerima dokumen fisik Rekomendasi Pencairan.
+2. Staf memindai (scan) dokumen dan mengunggahnya ke aplikasi.
+3. Mesin AI OCR (*RunPod*) secara otomatis membaca teks (Nama Desa, Kegiatan, Nominal) dan memformatnya menjadi JSON terstruktur (TMMD Format).
+4. Aplikasi akan melakukan *auto-fill* form Draft Transaksi pencairan.
+5. Proses verifikasi oleh Kepala Sub. Bidang & Kepala Bidang.
+6. Pencetakan SPP dan Kuitansi otomatis dengan nominal *terbilang*.
