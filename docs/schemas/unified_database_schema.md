@@ -1,60 +1,42 @@
 # Unified Database Schema (SIP-DADES-BAKEUDA)
 
-Skema database terpadu ini menggabungkan struktur dari file `ADD-2026.xls` dan `BKK 2026.xlsm` untuk diimplementasikan di **Supabase**.
+Skema database terpadu ini menggabungkan struktur dari file `ADD-2026.xls` dan `BKK 2026.xlsm` untuk diimplementasikan di **Appwrite**. Berbeda dengan RDBMS tradisional, Appwrite merupakan sistem berbasis dokumen (NoSQL). Kita menggunakan simulasi *Foreign Key* dengan menyimpan ID string dokumen terkait.
 
 ## ER Diagram (Mermaid)
 
 ```mermaid
 erDiagram
     MASTER_DESA {
-        uuid id PK
-        string kode_desa UK "Format ex: 01.02"
+        string _id PK
         string nama_desa
         string kecamatan
-    }
-    
-    MASTER_SUMBER_DANA {
-        uuid id PK
-        string kode_sumber "ex: ADD, BKK_SARPRAS, DD_REGULER, DD_INSENTIF"
-        string nama_sumber
-        string dasar_hukum "ex: PMK (Peraturan Menteri Keuangan)"
+        string no_rekening "opsional"
+        string nama_kepala_desa "opsional"
     }
     
     PAGU_ALOKASI {
-        uuid id PK
-        uuid desa_id FK
-        uuid sumber_dana_id FK
+        string _id PK
+        string desa FK "ID Dokumen master_desa"
         integer tahun_anggaran
-        float total_pagu_bruto
+        string jenis_dana "Enum: 'ADD', 'BKK'"
+        float pagu_total
     }
     
     TRANSAKSI_PENCAIRAN {
-        uuid id PK
-        uuid pagu_id FK
-        string tahap_ke "ex: Tahap 1, Tahap 2, Bulanan"
-        float nominal_potongan_bpjs
+        string _id PK
+        string pagu FK "ID Dokumen pagu_alokasi"
+        string keterangan "ex: Pencairan Tahap 1, Pencairan BKK"
         float nominal_pencairan_net
-        string status_verifikasi "DRAFT, REVIEW_KASUBBID, REVIEW_KABID, SPP_ISSUED"
         string no_rekomendasi
-        date tanggal_rekomendasi
-    }
-    
-    KWITANSI_CETAK {
-        uuid id PK
-        uuid transaksi_id FK
-        string no_kwitansi UK
-        string terbilang_rupiah
+        string status_verifikasi "Enum: 'DRAFT', 'DIPROSES', 'DISETUJUI', 'DITOLAK'"
+        string hasil_ocr "Menyimpan JSON raw dari RunPod OCR"
     }
 
     MASTER_DESA ||--o{ PAGU_ALOKASI : "menerima alokasi"
-    MASTER_SUMBER_DANA ||--o{ PAGU_ALOKASI : "diklasifikasikan dalam"
-    PAGU_ALOKASI ||--o{ TRANSAKSI_PENCAIRAN : "memiliki riwayat"
-    TRANSAKSI_PENCAIRAN ||--|| KWITANSI_CETAK : "menerbitkan"
+    PAGU_ALOKASI ||--o{ TRANSAKSI_PENCAIRAN : "memiliki riwayat pencairan"
 ```
 
-## Deskripsi Tabel
-1. **`master_desa`**: Tabel sentral untuk data geografis pemerintahan desa.
-2. **`master_sumber_dana`**: Menyelesaikan masalah perbedaan file Excel (ADD vs BKK) menjadi satu tabel *lookup* terpadu.
-3. **`pagu_alokasi`**: Tempat total anggaran tahunan dialokasikan per desa dan sumber dana.
-4. **`transaksi_pencairan`**: Jantung dari aplikasi. Menggantikan *sheet* `Pengajuan`, `Tahap 1`, dan `Tahap 2`. Memiliki *workflow state* (`status_verifikasi`) sesuai SOP.
-5. **`kwitansi_cetak`**: Tabel arsip untuk kuitansi yang telah diproses.
+## Deskripsi Koleksi (Appwrite Collections)
+1. **`master_desa`**: Koleksi referensi utama untuk data geografis dan rekening desa.
+2. **`pagu_alokasi`**: Tempat total anggaran tahunan dialokasikan per desa. Menyelesaikan masalah pemisahan file Excel (ADD vs BKK) menjadi satu koleksi terpadu dengan atribut filter/flag `jenis_dana`.
+3. **`transaksi_pencairan`**: Koleksi utama (*Jantung Aplikasi*). Menggantikan *sheet* `Pengajuan`, `Tahap 1`, dan `Tahap 2` di Excel. Menyimpan *workflow state* (`status_verifikasi`) sesuai SOP dan menampung hasil ekstrak otomatis OCR dari RunPod Serverless GPU.
