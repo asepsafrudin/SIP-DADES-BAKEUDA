@@ -11,12 +11,16 @@
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
     "@napi-rs/canvas": "^1.0.2",
+    "@types/pdfmake": "^0.3.3",
     "appwrite": "^26.2.0",
+    "dotenv": "^17.4.2",
     "next": "16.2.11",
     "node-appwrite": "^27.1.0",
     "openai": "^6.49.0",
+    "pdf-parse": "^2.4.5",
     "pdf2json": "^4.0.3",
     "pdfjs-dist": "^6.1.200",
+    "pdfmake": "^0.3.11",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "xlsx": "^0.18.5"

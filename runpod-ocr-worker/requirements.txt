@@ -1,0 +1,4 @@
+runpod==1.6.2
+# Tambahkan library OCR yang dibutuhkan di bawah ini
+# opencv-python-headless
+# python-doctr[torch]

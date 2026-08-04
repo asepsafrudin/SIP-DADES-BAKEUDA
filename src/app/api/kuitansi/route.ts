@@ -1,10 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Client, Databases, Query } from 'node-appwrite';
 
-const client = new Client()
-    .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT!)
-    .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID!)
-    .setKey(process.env.APPWRITE_API_KEY!);
+const client = new Client();
+
+if (process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT) {
+    client.setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT);
+}
+if (process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID) {
+    client.setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID);
+}
+if (process.env.APPWRITE_API_KEY) {
+    client.setKey(process.env.APPWRITE_API_KEY);
+}
 
 const databases = new Databases(client);
 const DB_ID = 'sipdades_db';

@@ -1,17 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import OpenAI from 'openai';
 import { Client, Databases } from 'node-appwrite';
 import { rateLimit } from '@/utils/rateLimit';
 import { logger } from '@/utils/logger';
+import { PDFParse } from 'pdf-parse';
 
-// Type definitions for OpenAI vision payload
-type MessageContentText = { type: 'text'; text: string };
-type MessageContentImage = { type: 'image_url'; image_url: { url: string } };
-type ContentPayload = MessageContentText | MessageContentImage;
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+export const maxDuration = 180;
 
 const client = new Client()
     .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT!)
@@ -19,7 +12,7 @@ const client = new Client()
     .setKey(process.env.APPWRITE_API_KEY!);
 
 export async function POST(req: NextRequest) {
-  const ip = req.headers.get('x-forwarded-for') ?? req.ip ?? 'unknown';
+  const ip = req.headers.get('x-forwarded-for') ?? 'unknown';
   
   // Rate Limit: 5 requests per minute
   const limit = rateLimit(ip, 5, 60 * 1000);
@@ -36,91 +29,125 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Tidak ada gambar yang diunggah' }, { status: 400 });
     }
 
-    // 2. Ambil Daftar Desa Resmi dari Database sebagai Referensi Ejaan AI
-    // Hal ini untuk mencegah typo seperti "Kailialang" atau "Tangkisian"
-    const databases = new Databases(client);
-    let referensiDesa = '';
-    try {
-      const desaRes = await databases.listDocuments(
-        process.env.APPWRITE_DATABASE_ID || 'sipdades_db',
-        'master_desa'
-      );
-      // Buat daftar nama unik lengkap dengan kecamatan
-      const daftarNama = desaRes.documents.map(d => `${d.nama_desa} Kec. ${d.kecamatan}`).join(', ');
-      referensiDesa = `\n\nPENTING (VALIDASI NAMA DESA): 
-Anda WAJIB menggunakan ejaan dan format nama desa beserta kecamatannya PERSIS seperti salah satu dari daftar referensi resmi berikut ini (Dilarang mengarang atau menggabungkan nama sendiri):
-[${daftarNama}]`;
-    } catch (e) {
-      logger.error('OCR_API', 'Gagal mengambil referensi desa', e);
+    const runpodApiKey = process.env.RUNPOD_API_KEY;
+    const runpodEndpointId = process.env.RUNPOD_ENDPOINT_ID;
+
+    if (!runpodApiKey || !runpodEndpointId) {
+       logger.error('OCR_API', 'Konfigurasi RunPod hilang di .env');
+       return NextResponse.json({ error: 'Konfigurasi server OCR tidak valid' }, { status: 500 });
     }
 
-    // Bangun payload pesan
-    const contentPayload: ContentPayload[] = [{ 
-      type: 'text', 
-      text: `Anda adalah asisten AI pengekstraksi data finansial desa berakurasi tinggi.
-Tugas Anda adalah membaca gambar/dokumen yang diunggah dan menghasilkan JSON murni dengan format berikut:
-{
-  "error_tipe_dokumen": "Isi dengan string kosong jika dokumen valid (Surat Pengantar/Rekomendasi). Jika dokumen adalah Kuitansi/Bukti Penyaluran/SP2D, isi dengan pesan error yang jelas dan kosongkan field lainnya.",
-  "metadata_sumber_dana": "Contoh: Bantuan Keuangan Khusus (Sarpras)",
-  "metadata_tahun_anggaran": "Contoh: 2026",
-  "metadata_no_surat": "Contoh: 900/123/Bakeuda/2026 (Cari Nomor Surat Pengantar/Rekomendasi di halaman pertama)",
-  "data": [
-    {
-      "nama_desa": "Nama desa beserta kecamatannya (Contoh: Panican Kec. Kemangkon)",
-      "kegiatan": "Nama kegiatan atau peruntukan",
-      "nominal": 100000000, // Harus berupa angka utuh, tanpa titik/koma
-      "no_rekening": "Nomor rekening (tanpa tanda strip/karakter lain)"
-    }
-  ]
-}
-Aturan Ekstraksi:
-- KLASIFIKASI DOKUMEN: Modul ini HANYA menerima Surat Pengantar / Pengajuan Rekomendasi Pencairan beserta lampirannya. JIKA halaman pertama yang Anda baca adalah KUITANSI atau BUKTI PENYALURAN yang menandakan uang sudah cair, Anda WAJIB mengisi "error_tipe_dokumen" dengan "Dokumen ditolak: Ini adalah Kuitansi/Bukti Penyaluran. Modul ini khusus untuk Surat Pengantar Pengajuan." dan kosongkan "data".
-- metadata_sumber_dana: Cari di halaman pertama/pengantar dokumen yang biasanya menyebutkan sumber dana alokasi.
-- metadata_tahun_anggaran: Cari tahun anggaran yang berlaku di pengantar dokumen.
-- metadata_no_surat: Cari Nomor Surat (biasanya terletak di bawah Kop Surat halaman pertama dokumen pengantar).
-- nominal: Pastikan mengonversi format Rupiah ke angka integer murni.
-- no_rekening: Hapus semua tanda baca/spasi. ${referensiDesa}` 
-    }];
-    
-    // Masukkan semua halaman gambar
-    images.forEach(base64Image => {
-      contentPayload.push({
-        type: 'image_url',
-        image_url: { url: base64Image }
-      });
-    });
+    // Check if it's a PDF
+    const isPdf = images[0].startsWith('data:application/pdf');
+    const base64Data = images[0].split(',')[1] || images[0];
 
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      response_format: { type: "json_object" },
-      messages: [
-        {
-          role: 'user',
-          content: contentPayload
+    if (isPdf) {
+      try {
+        const buffer = Buffer.from(base64Data, 'base64');
+        const parser = new PDFParse({ data: buffer });
+        const pdfData = await parser.getText();
+        const extractedText = pdfData.text.trim();
+        await parser.destroy();
+        
+        // If it has enough text, it's a native PDF. Skip RunPod.
+        if (extractedText.length > 100) {
+          logger.info('OCR_API', 'Berhasil mengekstrak teks native dari PDF');
+          return NextResponse.json({
+            success: true,
+            raw_text: extractedText,
+            is_native_pdf: true,
+            // You can add LLM processing here later if needed to structure the text
+            data: [] 
+          });
         }
-      ]
-    });
-
-    const resultText = completion.choices[0].message.content || '{"data":[]}';
-    const jsonData = JSON.parse(resultText);
-
-    // AI Classification Protection
-    if (jsonData.error_tipe_dokumen && jsonData.error_tipe_dokumen.trim() !== '') {
-      logger.warn('OCR_API', 'Dokumen ditolak oleh AI', { reason: jsonData.error_tipe_dokumen });
-      return NextResponse.json({ error: jsonData.error_tipe_dokumen }, { status: 400 });
+      } catch (e) {
+        logger.warn('OCR_API', 'Gagal parsing PDF Native, fallback ke RunPod', e);
+      }
     }
 
-    logger.info('OCR_API', 'Berhasil mengekstrak data OCR', { 
-      desaCount: jsonData.data?.length || 0 
+    const headers = {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${runpodApiKey}`
+    };
+
+    // Kirim job ke RunPod (async, tidak tunggu hasil)
+    const runResponse = await fetch(`https://api.runpod.ai/v2/${runpodEndpointId}/run`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ input: { image: base64Data } })
     });
 
-    return NextResponse.json({ 
-      success: true, 
-      metadata_sumber_dana: jsonData.metadata_sumber_dana || '',
-      metadata_tahun_anggaran: jsonData.metadata_tahun_anggaran || '',
-      metadata_no_surat: jsonData.metadata_no_surat || '',
-      data: jsonData.data || [] 
+    if (!runResponse.ok) {
+      const err = await runResponse.text();
+      logger.error('OCR_API', 'RunPod submit error', err);
+      return NextResponse.json({ error: 'Gagal mengirim dokumen ke server OCR' }, { status: runResponse.status });
+    }
+
+    const { id: jobId } = await runResponse.json();
+    logger.info('OCR_API', 'Job submitted', { jobId });
+
+    // Poll status setiap 3 detik, max 2.5 menit
+    const maxWaitMs = 150_000;
+    const pollInterval = 3000;
+    const started = Date.now();
+    let runpodResponse: Response | null = null;
+
+    while (Date.now() - started < maxWaitMs) {
+      await new Promise(r => setTimeout(r, pollInterval));
+      runpodResponse = await fetch(`https://api.runpod.ai/v2/${runpodEndpointId}/status/${jobId}`, { headers });
+      if (!runpodResponse.ok) break;
+      const statusData = await runpodResponse.clone().json();
+      logger.info('OCR_API', 'Polling status', { status: statusData.status, elapsed: Date.now() - started });
+      if (statusData.status === 'COMPLETED' || statusData.status === 'FAILED') break;
+    }
+
+    if (!runpodResponse || !runpodResponse.ok) {
+      return NextResponse.json({ error: 'Gagal memproses dokumen (koneksi RunPod bermasalah)' }, { status: 500 });
+    }
+
+    const result = await runpodResponse.json();
+    
+    logger.info('OCR_API', 'RunPod raw result', { status: result.status, hasOutput: !!result.output });
+
+    if (result.status !== "COMPLETED") {
+      logger.error('OCR_API', 'RunPod Task Gagal', result);
+      const errorMsg = result.error || result.output?.error || 'Pemrosesan AI gagal di RunPod';
+      return NextResponse.json({ error: errorMsg }, { status: 500 });
+    }
+
+    // handler.py mengembalikan: { status, raw_text, data: { metadata_sumber_dana, metadata_tahun_anggaran, metadata_no_surat, data[] } }
+    const output = result.output;
+
+    // Jika handler mengembalikan error field
+    if (output?.error) {
+      logger.error('OCR_API', 'Handler Error', output.error);
+      return NextResponse.json({ error: output.error }, { status: 500 });
+    }
+
+    const tmmdData = output?.data;
+
+    if (!tmmdData) {
+      logger.error('OCR_API', 'Output tidak memiliki field data', output);
+      return NextResponse.json({ 
+        error: 'Format data dari AI tidak valid',
+        raw_output: output 
+      }, { status: 500 });
+    }
+
+    logger.info('OCR_API', 'Berhasil mengekstrak data OCR melalui RunPod', {
+      jumlah_data: tmmdData.data?.length ?? 0
     });
+
+    // Teruskan langsung format TMMD dari handler ke frontend
+    return NextResponse.json({ 
+      success: true,
+      raw_text: output.raw_text || '',
+      metadata_sumber_dana: tmmdData.metadata_sumber_dana || '',
+      metadata_tahun_anggaran: tmmdData.metadata_tahun_anggaran || '2026',
+      metadata_no_surat: tmmdData.metadata_no_surat || '',
+      data: tmmdData.data || []
+    });
+
   } catch (error: unknown) {
     logger.error('OCR_API', 'OCR Server Error', error);
     const message = error instanceof Error ? error.message : 'Server Error';
