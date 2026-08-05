@@ -3,6 +3,7 @@ import { Client, Databases } from 'node-appwrite';
 import { rateLimit } from '@/utils/rateLimit';
 import { logger } from '@/utils/logger';
 import { validateAndSanitizeOcrResult } from '@/lib/validations/ocrSchema';
+import { getKillSwitchState, recordAiUsage } from '@/lib/killSwitch';
 import { PDFParse } from 'pdf-parse';
 
 export const maxDuration = 180;
@@ -33,9 +34,10 @@ export async function POST(req: NextRequest) {
     const runpodApiKey = process.env.RUNPOD_API_KEY;
     const runpodEndpointId = process.env.RUNPOD_ENDPOINT_ID;
 
-    if (!runpodApiKey || !runpodEndpointId) {
-       logger.error('OCR_API', 'Konfigurasi RunPod hilang di .env');
-       return NextResponse.json({ error: 'Konfigurasi server OCR tidak valid' }, { status: 500 });
+    // Check AI Kill-Switch Status
+    const killSwitch = getKillSwitchState();
+    if (killSwitch.active) {
+      logger.warn('OCR_API', 'AI Kill-Switch AKTIF - Melakukan fallback ke PDFParse lokal', { reason: killSwitch.reason });
     }
 
     // Check if it's a PDF

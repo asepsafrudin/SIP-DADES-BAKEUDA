@@ -114,6 +114,20 @@ async function setupStaging() {
         await new Promise(r => setTimeout(r, 2000));
       }
 
+      if (targetColId.includes("transaksi_pencairan")) {
+        const floatAttrs = ["nominal_pengajuan", "nominal_net", "nominal_pencairan_net", "potongan_bpjs"];
+        const stringAttrs = ["desa_id", "pagu", "pagu_id", "jenis_dana", "bulan_penyaluran", "tahap_ke", "keterangan", "status", "status_verifikasi", "no_rekomendasi"];
+
+        for (const f of floatAttrs) {
+          try { await databases.createFloatAttribute(targetDbId, targetColId, f, false); } catch {}
+        }
+        for (const s of stringAttrs) {
+          try { await databases.createStringAttribute(targetDbId, targetColId, s, 500, false); } catch {}
+        }
+
+        await new Promise(r => setTimeout(r, 2000));
+      }
+
       // Re-check existing documents count
       const checkDocs = await databases.listDocuments(targetDbId, targetColId, [Query.limit(1)]);
 

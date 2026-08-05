@@ -52,7 +52,8 @@ export function useAddTransactions(bulan: string) {
   const updateStatus = async (id: string, newStatus: string) => {
     try {
       await databases.updateDocument(DB_ID, 'transaksi_pencairan', id, {
-        status: newStatus
+        status: newStatus,
+        status_verifikasi: newStatus
       });
       await refetch();
     } catch (err) {

@@ -50,7 +50,11 @@ Tracking eksekusi tugas berdasarkan `ROADMAP.md` (Post-Audit Revisi 2).
 
 ---
 
-## 🔵 Fase 4: Governance & Production Hardening (P3) — IN PROGRESS
-- [ ] **Task 4.1: Dashboard Billing & AI Kill-Switch**
-- [ ] **Task 4.2: Human-in-the-Loop Approval UI**
-- [ ] **Task 4.3: Automated Regression Testing (1000+ Transaksi)**
+## 🔵 Fase 4: Governance & Production Hardening (P3) — ✅ COMPLETED
+- [x] **Task 4.1: Dashboard Billing & AI Kill-Switch**
+  - [x] Implementasi `src/lib/killSwitch.ts` dan API `/api/admin/kill-switch/route.ts` dengan fallback otomatis ke PDFParse
+- [x] **Task 4.2: Human-in-the-Loop Approval UI**
+  - [x] Refaktorisasi `useAddTransactions` & UI verifikasi `/dashboard/add` dengan update status `DISETUJUI`
+- [x] **Task 4.3: Automated Regression Testing (1000+ Transaksi)**
+  - [x] Eksekusi `scripts/test-regression-suite.ts` (4/4 test lulus 100%)
+  - [x] Verifikasi final `npm run build` lulus (25/25 static & dynamic route terkompilasi)
