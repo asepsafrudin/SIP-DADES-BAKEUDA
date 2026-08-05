@@ -173,7 +173,14 @@ export default function DashboardAddPage() {
                       <td className="px-6 py-4 text-center">
                         {row.status !== 'DISETUJUI' && (
                           <button 
-                            onClick={() => updateStatus(row.$id, 'DISETUJUI')}
+                            onClick={async () => {
+                              try {
+                                await updateStatus(row.$id, 'DISETUJUI');
+                                alert('Persetujuan berhasil diproses!');
+                              } catch (err: any) {
+                                alert(`PERINGATAN REGULASI:\n\n${err.message}`);
+                              }
+                            }}
                             className="text-white bg-green-500 hover:bg-green-600 text-xs px-3 py-1.5 rounded-lg font-medium transition-colors"
                           >
                             Setujui

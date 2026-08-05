@@ -60,17 +60,17 @@ async function runRegressionSuite() {
     console.error(`❌ TEST 2 FAILED: ${err.message}`);
   }
 
-  // TEST 3: Bulk Transaction Simulation (100 Batch Entries)
+  // TEST 3: Bulk Transaction Simulation (1000 Batch Entries)
   totalTests++;
   try {
-    console.log('⏳ Running bulk transaction insertion simulation...');
+    console.log('⏳ Running bulk transaction insertion simulation (1000 docs)...');
     let batchCreated = 0;
-    for (let i = 1; i <= 50; i++) {
+    for (let i = 1; i <= 1000; i++) {
       await databases.createDocument(DB_ID, 'staging_transaksi_pencairan', ID.unique(), {
         desa_id: `desa_reg_${i}`,
-        jenis_dana: 'ADD',
+        jenis_dana: i % 3 === 0 ? 'BHPR' : i % 2 === 0 ? 'BKK' : 'ADD',
         bulan_penyaluran: 'Agustus 2026',
-        tahap_ke: 'Tahap I',
+        tahap_ke: i <= 500 ? 'Tahap I' : 'Tahap II',
         nominal_pengajuan: 100000000 + (i * 1000000),
         potongan_bpjs: 4000000 + (i * 40000),
         nominal_net: 96000000 + (i * 960000),
@@ -80,8 +80,11 @@ async function runRegressionSuite() {
         keterangan: `Regression Test Transaction #${i}`
       });
       batchCreated++;
+      if (batchCreated % 100 === 0) {
+        console.log(`   → Progress: ${batchCreated}/1000 transaksi tersimpan...`);
+      }
     }
-    console.log(`✅ TEST 3: Bulk transaction insertion passed (${batchCreated} docs written to staging).`);
+    console.log(`✅ TEST 3: Bulk transaction insertion passed (${batchCreated}/1000 docs written to staging).`);
     passedTests++;
   } catch (err: any) {
     console.error(`❌ TEST 3 FAILED: ${err.message}`);

@@ -8,7 +8,7 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json({
     status: 'success',
-    data: getKillSwitchState()
+    data: await getKillSwitchState()
   });
 }
 
@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { active, reason } = body;
 
-    const newState = setKillSwitchState(Boolean(active), reason || 'Toggled via Admin UI');
+    const newState = await setKillSwitchState(Boolean(active), reason || 'Toggled via Admin UI');
 
     return NextResponse.json({
       status: 'success',

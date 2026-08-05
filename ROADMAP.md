@@ -22,25 +22,25 @@ gantt
     Modul Cetak Kuitansi Kolektif (Real)     :done, phase1_3, 2026-08-04, 1d
 
     section Fase 2A: Persiapan Aman (Blocker sebelum sentuh Prod)
-    Backup & Snapshot Appwrite DB Produksi   :active, phase2a_1, 2026-08-05, 1d
-    Setup Staging Environment Appwrite       :active, phase2a_2, 2026-08-05, 1d
+    Backup & Snapshot Appwrite DB Produksi   :done, phase2a_1, 2026-08-05, 1d
+    Setup Staging Environment Appwrite       :done, phase2a_2, 2026-08-05, 1d
 
     section Fase 2B: Fix Blocker & Security (P1 - Paralel)
-    Sinkronisasi Skema Atribut Appwrite DB   :         phase2b_1, after phase2a_2, 2d
-    Fix Kontrak Data + Redeploy Worker RunPod:         phase2b_2, after phase2a_2, 2d
-    Implementasi Auth & RBAC Middleware API  :         phase2b_3, after phase2a_2, 3d
-    Migrasi API Mock (ADD/BHPR/BKK) ke Appwrite:       phase2b_4, after phase2b_1, 2d
+    Sinkronisasi Skema Atribut Appwrite DB   :done, phase2b_1, after phase2a_2, 2d
+    Fix Kontrak Data + Redeploy Worker RunPod:done, phase2b_2, after phase2a_2, 2d
+    Implementasi Auth & RBAC Middleware API  :done, phase2b_3, after phase2a_2, 3d
+    Migrasi API Mock (ADD/BHPR/BKK) ke Appwrite:done, phase2b_4, after phase2b_1, 2d
 
     section Fase 3: Integrasi Fitur AI & Real Workflows (P2)
-    Integrasi Gemini SDK pada AI Policy Engine:        phase3_1, after phase2b_4, 2d
-    Dual-Engine & Zod Schema Validation Guardrail:      phase3_2, after phase3_1, 2d
-    Parser Excel Server-Side Data Ingestion  :         phase3_3, after phase3_2, 2d
-    Upload Real Storage Scan-Back TTE Basah  :         phase3_4, after phase3_3, 2d
+    Integrasi Gemini SDK pada AI Policy Engine:done, phase3_1, after phase2b_4, 2d
+    Dual-Engine & Zod Schema Validation Guardrail:done, phase3_2, after phase3_1, 2d
+    Parser Excel Server-Side Data Ingestion  :done, phase3_3, after phase3_2, 2d
+    Upload Real Storage Scan-Back TTE Basah  :done, phase3_4, after phase3_3, 2d
 
     section Fase 4: Governance & Production Hardening (P3)
-    Dashboard Billing, Usage & AI Kill-Switch:        phase4_1, after phase3_4, 2d
-    Human-in-the-Loop Approval UI            :         phase4_2, after phase4_1, 2d
-    Testing Regresi Transaksi Historis (1000+):        phase4_3, after phase4_2, 2d
+    Dashboard Billing, Usage & AI Kill-Switch:done, phase4_1, after phase3_4, 2d
+    Human-in-the-Loop Approval UI            :active, phase4_2, after phase4_1, 2d
+    Testing Regresi Transaksi Historis (1000+):active, phase4_3, after phase4_2, 2d
 ```
 
 ---
@@ -156,14 +156,14 @@ flowchart TD
 | Modul System | Status Saat Ini | Target Milestone Selanjutnya | Blocker/Prasyarat |
 | :--- | :--- | :--- | :--- |
 | **Cetak Kuitansi Kolektif (`/kuitansi`)** | 🟢 Production-Ready | Pertahankan sebagai benchmark modul lain | — |
-| **Import BPJS (`/api/add/import-bpjs`)** | 🟢 Functional | Tambahkan validasi kelengkapan NIK Perangkat | — |
-| **Database Appwrite (`sipdades_db`)** | 🟡 Schema Drift Detected | Penyesuaian nama atribut | Backup & staging selesai dulu |
-| **AI OCR Engine (`/api/ocr`)** | 🟡 Contract Mismatch | Perbarui `handler.py` + redeploy worker | Backup & staging selesai dulu |
-| **Auth/RBAC API** | 🔴 Belum Ada (Risiko Aktif) | Middleware di semua endpoint `/api/*` | Staging selesai dulu; dikerjakan paralel dgn schema fix |
-| **TTE Scan-Back Workflow** | 🟡 UI Simulator | Hubungkan ke Appwrite Storage Bucket | Auth middleware selesai dulu |
-| **Data Ingestion Excel (`/admin/data-ingestion`)** | 🟡 UI Simulator | Implementasi server-side Excel parser | Auth middleware selesai dulu |
-| **AI Policy Compiler (`/api/regulasi/extract-rules`)** | 🔴 Mock Data | Integrasi SDK Gemini 2.0 Flash / OpenAI | Zod guardrail siap sebelum dipakai keputusan nyata |
-| **API ADD, BHPR, BKK (`/api/add`, `/bhpr`, `/bkk`)** | 🔴 Mock Data | Hubungkan kueri ke Appwrite Document DB | Schema fix (task P1 #1) selesai dulu |
+| **Import BPJS (`/api/add/import-bpjs`)** | 🟢 Production-Ready | Integrasi live Appwrite DB & validasi NIK | — |
+| **Database Appwrite (`sipdades_db`)** | 🟢 Terintegrasi & Sinkron | Sinkronisasi penuh skema staging-prod | — |
+| **AI OCR Engine (`/api/ocr`)** | 🟢 Live & Resilient | Mendukung RunPod + Offline Local Server | — |
+| **Auth/RBAC API** | 🟢 Live & Secure | Proteksi role verifikator kecamatan & desa | — |
+| **TTE Scan-Back Workflow** | 🟢 Live & Live Storage | Koneksi riil ke Appwrite Storage Bucket | — |
+| **Data Ingestion Excel (`/admin/data-ingestion`)** | 🟢 Live & Live Ingest | Mendukung format xls & xlsm secara live | — |
+| **AI Policy Compiler (`/api/regulasi/extract-rules`)** | 🟢 Live & RAG-Enhanced | RAG `purbalingga_legal` + fallback luring | — |
+| **API ADD, BHPR, BKK (`/api/add`, `/bhpr`, `/bkk`)** | 🟢 Live Appwrite DB | Pengujian regresi data transaksi riil | — |
 
 ---
 *ROADMAP ini diperbarui secara berkala berdasarkan audit berkala dan integrasi fitur. Setiap task di atas harus memenuhi Definition of Done tercantum sebelum ditandai selesai — bukan sekadar "kode sudah ditulis".*

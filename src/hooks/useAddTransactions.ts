@@ -51,10 +51,17 @@ export function useAddTransactions(bulan: string) {
 
   const updateStatus = async (id: string, newStatus: string) => {
     try {
-      await databases.updateDocument(DB_ID, 'transaksi_pencairan', id, {
-        status: newStatus,
-        status_verifikasi: newStatus
+      const response = await fetch('/api/transactions', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, status: newStatus })
       });
+      
+      const resData = await response.json();
+      if (!response.ok) {
+        throw new Error(resData.message || resData.error || 'Gagal memperbarui status transaksi.');
+      }
+      
       await refetch();
     } catch (err) {
       console.error('Update status failed:', err);

@@ -5,6 +5,7 @@ import { logger } from '@/utils/logger';
 import { validateAndSanitizeOcrResult } from '@/lib/validations/ocrSchema';
 import { getKillSwitchState, recordAiUsage } from '@/lib/killSwitch';
 import { PDFParse } from 'pdf-parse';
+import { verifyAuth } from '@/lib/authMiddleware';
 
 export const maxDuration = 180;
 
@@ -14,6 +15,10 @@ const client = new Client()
     .setKey(process.env.APPWRITE_API_KEY!);
 
 export async function POST(req: NextRequest) {
+  // Auth Guard: Only authenticated roles may trigger OCR (RunPod cost)
+  const auth = await verifyAuth(req, ['SUPER_ADMIN', 'BAKEUDA', 'DINSOS', 'KECAMATAN']);
+  if (!auth.authorized) return auth.response!;
+
   const ip = req.headers.get('x-forwarded-for') ?? 'unknown';
   
   // Rate Limit: 5 requests per minute
@@ -35,7 +40,7 @@ export async function POST(req: NextRequest) {
     const runpodEndpointId = process.env.RUNPOD_ENDPOINT_ID;
 
     // Check AI Kill-Switch Status
-    const killSwitch = getKillSwitchState();
+    const killSwitch = await getKillSwitchState();
     if (killSwitch.active) {
       logger.warn('OCR_API', 'AI Kill-Switch AKTIF - Melakukan fallback ke PDFParse lokal', { reason: killSwitch.reason });
     }
@@ -47,7 +52,8 @@ export async function POST(req: NextRequest) {
     if (isPdf) {
       try {
         const buffer = Buffer.from(base64Data, 'base64');
-        const parser = new PDFParse({ data: buffer });
+        const uint8Array = new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength);
+        const parser = new PDFParse({ data: uint8Array });
         const pdfData = await parser.getText();
         const extractedText = pdfData.text.trim();
         await parser.destroy();
@@ -65,6 +71,61 @@ export async function POST(req: NextRequest) {
         }
       } catch (e) {
         logger.warn('OCR_API', 'Gagal parsing PDF Native, fallback ke RunPod', e);
+      }
+    }
+
+    const localOcrUrl = process.env.LOCAL_OCR_URL;
+    if (localOcrUrl) {
+      logger.info('OCR_API', `Mengirim dokumen ke Local OCR Server (${localOcrUrl})...`);
+      try {
+        const response = await fetch(localOcrUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ image: base64Data }),
+          signal: AbortSignal.timeout(30000) // 30s timeout
+        });
+        
+        if (response.ok) {
+          const output = await response.json();
+          const tmmdData = output?.data;
+          
+          if (tmmdData) {
+            const validated = validateAndSanitizeOcrResult({
+              status: 'success',
+              raw_text: output.raw_text || '',
+              metadata_sumber_dana: tmmdData.metadata_sumber_dana || 'ADD',
+              metadata_tahun_anggaran: tmmdData.metadata_tahun_anggaran || '2026',
+              metadata_no_surat: tmmdData.metadata_no_surat || '',
+              data: tmmdData.data || []
+            });
+            
+            const sanitizedData = validated.data || {
+              status: 'success',
+              raw_text: output.raw_text || '',
+              metadata_sumber_dana: tmmdData.metadata_sumber_dana || 'ADD',
+              metadata_tahun_anggaran: tmmdData.metadata_tahun_anggaran || '2026',
+              metadata_no_surat: tmmdData.metadata_no_surat || '',
+              data: tmmdData.data || []
+            };
+
+            logger.info('OCR_API', 'Berhasil mengekstrak data OCR melalui Local OCR Server', {
+              jumlah_data: sanitizedData.data.length
+            });
+
+            return NextResponse.json({ 
+              success: true,
+              raw_text: sanitizedData.raw_text,
+              metadata_sumber_dana: sanitizedData.metadata_sumber_dana,
+              metadata_tahun_anggaran: sanitizedData.metadata_tahun_anggaran,
+              metadata_no_surat: sanitizedData.metadata_no_surat,
+              data: sanitizedData.data
+            });
+          }
+        } else {
+          logger.warn('OCR_API', `Local OCR Server returned status ${response.status}, falling back to RunPod`);
+        }
+      } catch (err: any) {
+        logger.error('OCR_API', 'Local OCR Server failed, falling back to RunPod', err);
       }
     }
 

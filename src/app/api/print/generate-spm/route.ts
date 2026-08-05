@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { verifyAuth } from '@/lib/authMiddleware';
 
 export async function GET(request: NextRequest) {
+  // Auth Guard: Dokumen SPM hanya boleh dicetak oleh BAKEUDA & SUPER_ADMIN
+  const auth = await verifyAuth(request, ['SUPER_ADMIN', 'BAKEUDA']);
+  if (!auth.authorized) return auth.response!;
+
   const searchParams = request.nextUrl.searchParams;
   const bulan = searchParams.get('bulan') || 'Agustus 2026';
   const desa = searchParams.get('desa') || 'Kedungbenda';

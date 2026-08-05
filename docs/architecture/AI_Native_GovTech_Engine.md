@@ -1,76 +1,71 @@
-# Arsitektur AI-Native Governance Engine & Rules-as-Code (RaC)
+# Arsitektur & Implementasi AI-Native Governance Engine (Rules-as-Code)
+**Sistem Informasi Pengelolaan Dana Desa dan Bantuan Keuangan (SIP-DADES) Kabupaten Purbalingga**
 
-Dokumen arsitektur ini mendeskripsikan bagaimana **AI secara native** bertindak sebagai pengawas dan pengatur logika bisnis dinamis pada aplikasi **SIP-DADES BAKEUDA Kabupaten Purbalingga**.
+Dokumen ini memuat spesifikasi arsitektur dan status implementasi riil sistem tata kelola cerdas berbasis **Rules-as-Code (RaC)** pada aplikasi **SIP-DADES BAKEUDA**.
 
 ---
 
-## 1. Konsep Dasar: Neuro-Symbolic Architecture
+## 1. Konsep Inti: Neuro-Symbolic Architecture
 
-Aplikasi konvensional menggunakan *Hardcoded Logic* (di mana aturan ditanam mati di kode program). Sistem GovTech modern seperti SIP-DADES menggunakan **Arsitektur Neuro-Symbolic**:
+Untuk menghindari risiko kelambatan (*latency*) dan biaya komputasi tinggi, sistem ini tidak bergantung penuh pada kecerdasan buatan (AI) saat transaksi diajukan. Kami menerapkan **Neuro-Symbolic Architecture** yang membagi tugas menjadi dua lapisan:
 
 ```mermaid
 flowchart TD
-    A["Teks Regulasi Mentah (PDF Perbup / SK Bupati)"] -->|1. Neural Layer (LLM Compiler)| B["JSON Logic / AST Rule Schema"]
-    B -->|2. Symbolic Layer (Deterministic Engine)| C["Middleware Validasi Transaksi"]
+    A["Teks Regulasi Mentah (PDF Perbup / PMK 7)"] -->|1. Neural Layer (Gemini Compiler)| B["JSON Logic (master_regulasi)"]
+    B -->|2. Symbolic Layer (ruleEvaluator.ts)| C["Middleware Validasi Transaksi"]
     C -->|3. Realtime Guardrail| D["Transaksi Desa (Submit ADD / BHPR / BKK)"]
     D -->|Lolos Validasi| E["RKUD / SPP / SPM (CAIR)"]
     D -->|Melanggar Aturan| F["Blokir & Peringatan Pasal"]
 ```
 
-1. **Neural Layer (LLM Compiler):** Menggunakan AI Generatif (Gemini/OpenAI) untuk membaca naskah hukum Perbup yang dinamis dan menerjemahkannya menjadi aturan logis berstandar **JSON Logic / Abstract Syntax Tree (AST)**.
-2. **Symbolic Layer (Deterministic Engine):** Menjalankan aturan JSON Logic tersebut secara deterministik (100% tepat, 0% halusinasi, kecepatan 1ms) di Backend Next.js saat transaksi diajukan.
+1.  **Neural Layer (LLM Compiler):** Menggunakan AI Generatif (Gemini/Ollama) untuk membaca naskah hukum Perbup yang dinamis dan menerjemahkannya menjadi aturan logis berstandar **JSON Logic / Abstract Syntax Tree (AST)**.
+2.  **Symbolic Layer (Deterministic Engine):** Menjalankan aturan JSON Logic tersebut secara deterministik (100% tepat, 0% halusinasi, kecepatan 1ms) di Backend Next.js saat transaksi diajukan.
 
 ---
 
-## 2. Preseden Industri (GovTech & RegTech Global)
+## 2. Detail Implementasi Komponen Sistem
 
-Konsep yang kita terapkan di SIP-DADES sejalan dengan gerakan global **Rules as Code (RaC)** dan arsitektur RegTech terkemuka:
+### A. Document Extraction & Local OCR Server
+*   **Implementasi:** Menggunakan PyMuPDF (`fitz`) untuk ekstraksi PDF asli dan EasyOCR untuk citra pindaian (scan).
+*   **Kemandirian Luring:** Selain terhubung dengan RunPod GPU Cloud secara daring, disediakan berkas server lokal [local_server.py](file:///home/aseps/MCP/workspace/SIP-DADES-BAKEUDA/worker-repo/local_server.py) berbasis FastAPI (port 5000) untuk mengeksekusi OCR secara lokal pada intranet dinas.
+*   **API Integrasi:** Endpoint `/api/ocr` secara otomatis mengalihkan kueri ke `LOCAL_OCR_URL` jika variabel tersebut disetel di `.env`.
 
-### A. OECD & Government of New Zealand / UK (Rules as Code)
-* **Kasus:** Pemerintah Selandia Baru dan OECD memelopori gerakan di mana peraturan perpajakan dan bantuan sosial tidak hanya diterbitkan sebagai dokumen teks, tetapi disertai **API Regulasi** agar dapat dieksekusi langsung oleh aplikasi pemerintah tanpa perantara pemrogram.
+### B. AI Policy Compiler & RAG (Layer 2)
+*   **Implementasi:** API [route.ts (extract-rules)](file:///home/aseps/MCP/workspace/SIP-DADES-BAKEUDA/src/app/api/regulasi/extract-rules/route.ts) memanggil Gemini AI dengan setelan `temperature: 0` untuk akurasi mutlak.
+*   **SSE MCP Client:** Backend Next.js bertindak sebagai client MCP yang berkomunikasi via SSE ke port 8000 untuk mengeksekusi `knowledge_search`.
+*   **Injeksi Konteks:** Kueri semantik secara dinamis memuat peraturan terkait dari basis pengetahuan RAG lokal untuk memandu LLM menyusun parameter secara konsisten.
 
-### B. Palantir Foundry (GovTech & Enterprise Security)
-* **Kasus:** Palantir menggunakan *Ontology Engine*. Kebijakan dan batasan anggaran tidak dicoding manual, melainkan didefinisikan sebagai *Objects & Action Rules* yang secara otomatis memantau seluruh transaksi keuangan negara secara *real-time*.
+### C. Central Rule Repository (`master_regulasi`)
+*   **Implementasi:** Menyimpan parameter aktif per `tahun_anggaran` di database Appwrite (koleksi `master_regulasi`). Aturan disimpan dalam format JSON terstruktur yang memuat limit ADD bulanan, persentase BPJS, dan status PBB-P2.
 
-### C. Harvey & TaxFix (LegalTech / FinTech)
-* **Kasus:** Memisahkan membaca naskah hukum (*Document Understanding*) dengan mesin kalkulasi. LLM bertugas menyusun *Constraint Matrix*, sedangkan transaksi dievaluasi oleh mesin matematika murni.
-
----
-
-## 3. Komponen Infrastruktur AI-Native SIP-DADES
-
-Untuk menjadikan tombol **"🤖 Ekstrak & Terapkan Regulasi via AI"** di halaman `/dashboard/regulasi` sebagai pusat kendali otonom, infrastrukturnya dibagi menjadi 4 komponen utama:
-
-### 1. Document Extraction Pipeline
-* **Teknologi:** OpenDataLoader + EasyOCR RunPod GPU Serverless.
-* **Fungsi:** Mengonversi PDF Perbup/SK Bupati menjadi Markdown terstruktur.
-
-### 2. AI Policy Compiler
-* **Teknologi:** Gemini API / OpenAI Prompt Engine (`/api/regulasi/extract-rules`).
-* **Output:** Mengeluarkan skema JSON Logic yang memuat parameter (ADDM 70%, BHPR 20%, PBB 100%, cap 2%/3%).
-
-### 3. Central Rule Repository (`master_regulasi`)
-* **Teknologi:** Appwrite NoSQL Document Database.
-* **Fungsi:** Menyimpan parameter aktif per `tahun_anggaran`.
-
-### 4. Middleware Guardrail (`validateTransaction()`)
-* **Teknologi:** Next.js API Middleware.
-* **Fungsi:** Memeriksa setiap pengajuan kuitansi desa secara *real-time* sebelum masuk ke database transaksi. Jika ada selisih Rp 1 saja yang melanggar Perbup, transaksi ditolak dengan mereferensikan Pasal terkait.
+### D. Middleware Guardrail (`validateTransaction()`)
+*   **Implementasi:** Validasi transaksi diatur secara terpusat oleh [ruleEvaluator.ts](file:///home/aseps/MCP/workspace/SIP-DADES-BAKEUDA/src/lib/validations/ruleEvaluator.ts) yang disuntikkan ke rute handler `PATCH /api/transactions`.
+*   **Aturan yang Ditegakkan:**
+    *   *Batas Bulanan:* Akumulasi pengajuan ADD per bulan tidak boleh melebihi 1/12 pagu tahunan desa (Pasal 21 Perbup ADD).
+    *   *BPJS Kesehatan:* Memastikan potongan 4% iuran Pemda dihitung dengan tepat pada bulan Januari.
+    *   *BHPR Tahap II:* Memblokir pencairan BHPR Tahap II secara otomatis jika setoran PBB-P2 desa belum lunas 100% (Pasal 8 Perbup BHPR).
+    *   *User Interface:* Jika validasi gagal, status transaksi ditolak dan modal verifikasi di dashboard akan menampilkan rujukan pasal regulasi yang dilanggar secara eksplisit.
 
 ---
 
-## 4. Ingest Context Hukum Indonesia & Akses MCP Client (Advanced Layer 2)
+## 3. Pangkalan Pengetahuan & Isolasi RAG Purbalingga
+Untuk mendukung rencana *Standalone Deployment* (Deployment Mandiri) di Kabupaten Purbalingga, basis pengetahuan RAG diisolasi secara ketat pada server lokal menggunakan database PostgreSQL + `pgvector` (model embedding: `nomic-embed-text` 768 dimensi).
 
-Untuk memastikan **Layer 2 (AI Policy Compiler)** bekerja tanpa cacat, dua elemen canggih disuntikkan ke dalam model AI:
+Sebanyak **16 dokumen hukum utama** telah di-ingest ke dalam RAG pada dua namespace terisolasi:
 
-### A. Ingest Parameter Global Hukum & Keuangan Negara Indonesia
-Model AI tidak hanya diberikan naskah Perbup secara terisolasi, tetapi diabekali **Sistem Konteks Hirarki Hukum Indonesia** (UU 6/2014 & UU 3/2024 tentang Desa, UU 1/2022 HKPD, Permendagri 20/2018, PMK Dana Desa):
-* **Taksonomi Istilah:** AI secara *native* memahami akronim dan istilah lokal Keuangan Daerah Purbalingga (misal: *Siltap, ADDM, ADDP, RKUD, RKD, PBB-P2, BHPR, TMMD, BKK, SPTJM*).
-* **Prinsip Lex Superior Derogat Legi Inferiori:** AI mengetahui hierarki bahwa Perbup tidak boleh bertentangan dengan PMK atau Undang-Undang di atasnya.
+1.  **`purbalingga_legal` (Hukum & Regulasi):**
+    *   *PMK RI No. 7 Tahun 2026:* Batang Tubuh, Lampiran Pagu Desa Purbalingga, dan Rincian IRID Purbalingga (di-ingest dalam bentuk potongan/chunks 100 baris).
+    *   *Perbup ADD:* Perbup No. 1 Tahun 2026 (Batang Tubuh & Lampiran).
+    *   *Perbup BHPR:* Perbup No. 9 Tahun 2025 & Perbup Perubahan No. 5 Tahun 2026.
+    *   *SK Alokasi:* SK Alokasi BKK 2026, SK Alokasi BHPR 2026, dan SK TMMD 2026.
+    *   *SOP & BPJS:* Surat BPJS 2026, SOP ADD bulanan, SOP BHPR tahunan, dan SOP BKK per-termin.
+2.  **`bakeuda_internal` (Prosedur Teknis Sistem):**
+    *   Dokumen spesifikasi rule engine, SOP inisialisasi master data super admin, UX & RBAC Plan, serta dokumen arsitektur server.
 
-### B. AI Agent sebagai MCP Client (Tooling & Skills Access)
-Dengan menjadikan Layer 2 sebagai **MCP Client**, AI Compiler memiliki kemampuan *Tool Call* ke layanan MCP ekosistem kita saat mengekstrak regulasi:
-1. **Memanggil `knowledge_search` (Namespace: `shared_legal`):** Mengecek apakah pasal di Perbup 2026 ini merevisi atau menghapus pasal di Perbup 2025 (Cross-reference audit).
-2. **Memanggil `query_db` (Simulasi Dampak Transaksi):** Sebelum menyetujui parameter baru, AI dapat menjalankan simulasi *dry-run* ke database transaksi desa untuk menghitung dampak finansial ("Jika ADDM dinaikkan dari 70% ke 75%, berapa desa yang akan mengalami defisit Siltap?").
-3. **Memanggil `mcp-ltm-manager`:** Menyimpan *learnings* & histori ekstraksi regulasi ke Long Term Memory (LTM).
+---
 
+## 4. Mitigasi Risiko & Ketahanan Sistem (Resilience)
+
+*   **Zero-LLM Cost on Runtime:** Evaluasi transaksi harian desa berjalan sepenuhnya luring menggunakan kode backend native Node.js di server lokal. Sistem tidak melakukan panggilan API LLM cloud untuk transaksi harian, sehingga menghemat biaya operasional (Rp 0/transaksi) dengan latency eksekusi **< 2ms**.
+*   **Toleransi Gangguan (3-Tier Fallback):** Jika API Gemini Cloud mengalami kegagalan jaringan atau kehabisan limit kuota, backend API `/api/regulasi/extract-rules` secara otomatis mengalihkan proses ke **Local Ollama LLM** (timeout 15 detik). Jika server Ollama juga tidak merespons, sistem secara aman beralih ke **Deterministic Rules-Based Extractor** bawaan untuk menjaga kelangsungan layanan admin.
+*   **Human-in-the-Loop (HitL) Guardrail:** AI hanya berwenang merumuskan draf regulasi di database. Hak mengaktifkan parameter aturan di produksi tetap berada di bawah kendali eksklusif Super Admin / Kabid Bakeuda melalui tombol persetujuan visual di dashboard.

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Client, Databases, Query, ID } from 'node-appwrite';
 import { logger } from '@/utils/logger';
+import { verifyAuth } from '@/lib/authMiddleware';
+import { normalizeRules, validateTransaction } from '@/lib/validations/ruleEvaluator';
 
 interface TransactionItem {
   nama_desa: string;
@@ -32,6 +34,10 @@ const databases = new Databases(client);
 const DB_ID = 'sipdades_db';
 
 export async function POST(req: NextRequest) {
+  // Auth Guard: Hanya BAKEUDA & SUPER_ADMIN yang boleh simpan transaksi pencairan
+  const auth = await verifyAuth(req, ['SUPER_ADMIN', 'BAKEUDA']);
+  if (!auth.authorized) return auth.response!;
+
   try {
     const { data, sumber_dana, tahun, no_surat } = await req.json();
     
@@ -170,5 +176,106 @@ export async function POST(req: NextRequest) {
     logger.error('TRANSACTIONS_API', 'Save Error', error);
     const message = error instanceof Error ? error.message : 'Server Error';
     return NextResponse.json({ error: message }, { status: 500 });
+  }
+}
+
+export async function PATCH(req: NextRequest) {
+  // Auth Guard: Hanya BAKEUDA & SUPER_ADMIN yang boleh menyetujui transaksi
+  const auth = await verifyAuth(req, ['SUPER_ADMIN', 'BAKEUDA']);
+  if (!auth.authorized) return auth.response!;
+
+  try {
+    const { id, status } = await req.json();
+
+    if (!id || !status) {
+      return NextResponse.json({ error: 'ID transaksi dan status baru wajib dikirim.' }, { status: 400 });
+    }
+
+    if (status !== 'DISETUJUI' && status !== 'DITOLAK' && status !== 'DRAFT') {
+      return NextResponse.json({ error: 'Status tidak valid.' }, { status: 400 });
+    }
+
+    // 1. Ambil dokumen transaksi pencairan
+    const doc = await databases.getDocument(DB_ID, 'transaksi_pencairan', id);
+
+    // 2. Jika status berubah menjadi DISETUJUI, jalankan Symbolic Rule Engine
+    if (status === 'DISETUJUI') {
+      // Ambil tahun dari pagu alokasi terkait untuk menarik regulasi yang pas
+      let tahunAnggaran = 2026;
+      try {
+        const paguDoc = await databases.getDocument(DB_ID, 'pagu_alokasi', doc.pagu ?? doc.pagu_id);
+        tahunAnggaran = paguDoc.tahun_anggaran || 2026;
+      } catch (err) {
+        logger.warn('TRANSACTIONS_PATCH', `Gagal mengambil tahun_anggaran dari pagu: ${doc.pagu ?? doc.pagu_id}`);
+      }
+
+      // Ambil regulasi aktif
+      let rulesJson: any = {
+        tahun_anggaran: tahunAnggaran,
+        perbup_add: { limit_bulanan: 0.08333 },
+        bpjs: { iuran_pemda_pct: 0.04, bulan_potongan: 'Januari' }
+      };
+
+      try {
+        const regRes = await databases.listDocuments(DB_ID, 'master_regulasi', [
+          Query.equal('tahun_anggaran', tahunAnggaran),
+          Query.limit(1)
+        ]);
+        if (regRes.total > 0 && regRes.documents[0].rules_json) {
+          rulesJson = typeof regRes.documents[0].rules_json === 'string'
+            ? JSON.parse(regRes.documents[0].rules_json)
+            : regRes.documents[0].rules_json;
+        }
+      } catch (err) {
+        logger.warn('TRANSACTIONS_PATCH', 'Gagal memuat master_regulasi dari DB, menggunakan fallback default');
+      }
+
+      const normalizedRules = normalizeRules(rulesJson);
+
+      // Jalankan validator guardrail
+      const validation = await validateTransaction(
+        databases,
+        DB_ID,
+        {
+          $id: doc.$id,
+          desa_id: doc.desa_id || doc.desa,
+          jenis_dana: doc.jenis_dana || 'ADD',
+          bulan_penyaluran: doc.bulan_penyaluran || 'Agustus 2026',
+          tahap_ke: doc.tahap_ke || 'Rekomendasi Scanner',
+          nominal_pengajuan: doc.nominal_pengajuan || 0,
+          potongan_bpjs: doc.potongan_bpjs || 0
+        },
+        normalizedRules
+      );
+
+      if (!validation.valid) {
+        logger.warn('TRANSACTIONS_PATCH', 'Transaksi ditolak oleh Rules-as-Code Guardrail', {
+          id,
+          errors: validation.errors
+        });
+        return NextResponse.json({
+          status: 'error',
+          message: validation.errors.join(' '),
+          errors: validation.errors,
+          pasal: validation.pasalRujukan
+        }, { status: 400 });
+      }
+    }
+
+    // 3. Update status transaksi di database
+    const updatedDoc = await databases.updateDocument(DB_ID, 'transaksi_pencairan', id, {
+      status: status,
+      status_verifikasi: status
+    });
+
+    return NextResponse.json({
+      status: 'success',
+      message: `Status transaksi berhasil diubah menjadi ${status}.`,
+      data: updatedDoc
+    });
+
+  } catch (error: any) {
+    logger.error('TRANSACTIONS_PATCH', 'Gagal memperbarui status transaksi', error);
+    return NextResponse.json({ error: error.message || 'Server Error' }, { status: 500 });
   }
 }

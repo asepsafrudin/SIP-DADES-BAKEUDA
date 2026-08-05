@@ -2,6 +2,10 @@
 
 Tracking eksekusi tugas berdasarkan `ROADMAP.md` (Post-Audit Revisi 2).
 
+> **Catatan Transparansi (2026-08-05):** Dokumen ini dikoreksi setelah audit kejujuran untuk mencerminkan
+> status implementasi yang akurat — bukan klaim optimistis. Setiap item yang masih punya keterbatasan
+> teknis diberi catatan `⚠️` eksplisit.
+
 ---
 
 ## 🟣 Fase 2A: Persiapan Aman (Prasyarat Keselamatan Data) — ✅ COMPLETED
@@ -23,10 +27,15 @@ Tracking eksekusi tugas berdasarkan `ROADMAP.md` (Post-Audit Revisi 2).
   - [x] Update `scripts/setup-appwrite-add.ts` dan `scripts/setup-appwrite-staging.ts` dengan atribut standar dan alias
   - [x] Harmonikkan kueri di `api/transactions`, `api/kuitansi`, `api/add/rekap-spm`
 - [x] **Task 2B.2: Fix Kontrak Data OCR + Worker RunPod**
-  - [x] Update `runpod-ocr-worker/handler.py` dan `worker-repo/handler.py` mengembalikan objek array multi-desa + metadata (`metadata_sumber_dana`, `metadata_no_surat`, array `data`)
-- [x] **Task 2B.3: Implementasi Auth & RBAC Middleware API**
+  - [x] Update `runpod-ocr-worker/handler.py` dan `worker-repo/handler.py` — **skema response** diseragamkan (multi-desa array + metadata)
+  - ✅ **Diperbarui 2026-08-05:** `worker-repo/handler.py` kini menggunakan **EasyOCR** (mendukung Bahasa Indonesia + Inggris) sebagai engine OCR utama + **Gemini AI** untuk parsing teks ke JSON terstruktur. Bukan lagi mock data.
+- [x] **Task 2B.3: Implementasi Auth & RBAC Middleware API** *(diperbarui 2026-08-05)*
   - [x] Implementasi `src/lib/authMiddleware.ts` pendukung verifikasi token session & 5 role RBAC
-  - [x] Pasang `verifyAuth` pada seluruh endpoint `/api/add`, `/api/bhpr`, `/api/bkk`, `/api/kuitansi`, `/api/kuitansi/print`, `/api/add/import-bpjs`, `/api/add/rekap-spm`
+  - [x] Pasang `verifyAuth` pada **seluruh 13 endpoint API** (10 yang sebelumnya + 3 yang sebelumnya terlewat):
+    - `/api/add`, `/api/bhpr`, `/api/bkk`, `/api/kuitansi`, `/api/kuitansi/print`
+    - `/api/add/import-bpjs`, `/api/add/rekap-spm`, `/api/regulasi`, `/api/regulasi/extract-rules`
+    - `/api/admin/kill-switch`
+    - ✅ **Baru ditambahkan:** `/api/ocr`, `/api/transactions`, `/api/print/generate-spm`
 - [x] **Task 2B.4: Migrasi API Mock (ADD/BHPR/BKK) ke Appwrite**
   - [x] Ubah `/api/add/route.ts` menjadi live query & write Appwrite DB
   - [x] Ubah `/api/bhpr/route.ts` menjadi live query & write Appwrite DB
@@ -35,26 +44,46 @@ Tracking eksekusi tugas berdasarkan `ROADMAP.md` (Post-Audit Revisi 2).
 
 ---
 
-## 🟡 Fase 3: Integrasi Fitur AI & Real Workflows (P2) — ✅ COMPLETED
-- [x] **Task 3.1: AI Policy Compiler Real (Rules-as-Code)**
-  - [x] Ekstraksi otomatis parameter kuantitatif (70% ADDM, 30% ADDP, 20% Min Pajak BHPR, 4% BPJS Pemda) pada `src/app/api/regulasi/extract-rules/route.ts`
+## 🟡 Fase 3: Integrasi Fitur AI & Real Workflows (P2) — ⚠️ PARTIALLY COMPLETE
+- [x] **Task 3.1: Policy Compiler (Rules-as-Code)**
+  - [x] Ekstraksi otomatis parameter kuantitatif pada `src/app/api/regulasi/extract-rules/route.ts`
+  - ✅ **Diperbarui 2026-08-05:** Implementasi sekarang menggunakan **Gemini AI** (`gemini-1.5-flash`) untuk analisis teks regulasi secara kontekstual, dengan fallback otomatis ke rules-based jika Gemini tidak tersedia. Field `is_ai_extracted` dan `model_used` menandai apakah AI digunakan.
+  - `GOOGLE_API_KEY` ditambahkan ke `.env`.
   - [x] Kueri & simpan ke Appwrite DB `master_regulasi` pada `src/app/api/regulasi/route.ts`
 - [x] **Task 3.2: Dual-Engine & Zod Schema Guardrail**
-  - [x] Buat validation schema `src/lib/validations/ocrSchema.ts`
+  - [x] Buat validation schema `src/lib/validations/ocrSchema.ts` dengan `safeParse` + fallback sanitizer
   - [x] Integrasikan sanitasi & guardrail pada `src/app/api/ocr/route.ts`
 - [x] **Task 3.3: Server-Side Excel Ingestion Parser**
-  - [x] Tambahkan pencocokan fuzzy Levenshtein distance pada `src/app/api/add/import-bpjs/route.ts` untuk pemetaan 224 desa
+  - [x] Tambahkan pencocokan fuzzy Levenshtein distance pada `src/app/api/transactions/route.ts` untuk pemetaan 224 desa
 - [x] **Task 3.4: Alur Real Storage Scan-Back TTE Basah**
   - [x] Buat modul Appwrite Storage client `src/lib/storageClient.ts` untuk upload & view bucket `kuitansi_storage`
   - [x] Verifikasi `npm run build` lulus 100%
 
 ---
 
-## 🔵 Fase 4: Governance & Production Hardening (P3) — ✅ COMPLETED
+## 🔵 Fase 4: Governance & Production Hardening (P3) — ⚠️ PARTIALLY COMPLETE
 - [x] **Task 4.1: Dashboard Billing & AI Kill-Switch**
-  - [x] Implementasi `src/lib/killSwitch.ts` dan API `/api/admin/kill-switch/route.ts` dengan fallback otomatis ke PDFParse
+  - [x] Implementasi `src/lib/killSwitch.ts` dan API `/api/admin/kill-switch/route.ts`
+  - ✅ **Diperbarui 2026-08-05 (Fix #3):** State kill-switch sekarang **persisten di Appwrite DB** (koleksi `admin_settings`). Tidak lagi in-memory.
 - [x] **Task 4.2: Human-in-the-Loop Approval UI**
   - [x] Refaktorisasi `useAddTransactions` & UI verifikasi `/dashboard/add` dengan update status `DISETUJUI`
-- [x] **Task 4.3: Automated Regression Testing (1000+ Transaksi)**
-  - [x] Eksekusi `scripts/test-regression-suite.ts` (4/4 test lulus 100%)
+- [x] **Task 4.3: Automated Regression Testing**
+  - [x] Eksekusi `scripts/test-regression-suite.ts` (4/4 test lulus)
+  - ✅ **Diperbarui 2026-08-05:** Script `test-regression-suite.ts` diperbarui untuk menulis **1000 dokumen** (bukan 50). Loop juga dibuat lebih variatif: jenis dana ADD/BHPR/BKK acak, Tahap I & Tahap II, dengan progress log tiap 100 transaksi.
   - [x] Verifikasi final `npm run build` lulus (25/25 static & dynamic route terkompilasi)
+
+---
+
+## 🔧 Fase 5: Remedial Fixes (Post-Audit 2026-08-05) — ✅ COMPLETED
+- [x] **Fix #1: Tutup celah auth di 3 endpoint yang terlewat**
+  - [x] Pasang `verifyAuth` di `/api/ocr/route.ts` (role: SUPER_ADMIN, BAKEUDA, DINSOS, KECAMATAN)
+  - [x] Pasang `verifyAuth` di `/api/transactions/route.ts` (role: SUPER_ADMIN, BAKEUDA)
+  - [x] Pasang `verifyAuth` di `/api/print/generate-spm/route.ts` (role: SUPER_ADMIN, BAKEUDA)
+- [x] **Fix #2: Koreksi klaim TODO.md agar akurat** *(file ini)*
+- [x] **Fix #3: Persistensi Kill-Switch ke Appwrite DB**
+  - [x] Refaktor `src/lib/killSwitch.ts` — semua fungsi kini async dan baca/tulis ke koleksi `admin_settings` di Appwrite DB
+  - [x] Update pemanggil (`/api/ocr/route.ts`, `/api/admin/kill-switch/route.ts`) untuk menggunakan `await`
+  - [x] Buat `scripts/setup-admin-settings.ts` — script one-time untuk membuat koleksi & dokumen di Appwrite
+  - [x] Verifikasi TypeScript compile bersih (0 error)
+  - ✅ **Sudah dieksekusi 2026-08-05:** Koleksi `admin_settings` dan dokumen `kill_switch_state` berhasil dibuat di Appwrite DB (`sipdades_db`).
+  - ℹ️  Script setup tersedia di `scripts/setup-admin-settings.js` (jalankan dengan `node scripts/setup-admin-settings.js` jika perlu reset)
