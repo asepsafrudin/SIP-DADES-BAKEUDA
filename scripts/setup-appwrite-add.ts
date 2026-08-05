@@ -112,23 +112,29 @@ async function setup() {
 
     // Attributes for pagu_alokasi
     console.log("Setting up attributes for pagu_alokasi...");
-    await createStringAttr("pagu_alokasi", "desa_id", 50, true);
-    await createIntegerAttr("pagu_alokasi", "tahun_anggaran", true);
-    await createStringAttr("pagu_alokasi", "jenis_dana", 50, true); // ADD, BKK_SARPRAS, dll
-    await createFloatAttr("pagu_alokasi", "pagu_total", true);
+    await createStringAttr("pagu_alokasi", "desa_id", 50, false);
+    await createStringAttr("pagu_alokasi", "desa", 50, false);
+    await createIntegerAttr("pagu_alokasi", "tahun_anggaran", false);
+    await createStringAttr("pagu_alokasi", "jenis_dana", 50, false);
+    await createFloatAttr("pagu_alokasi", "pagu_total", false);
+    await createFloatAttr("pagu_alokasi", "total_pagu_bruto", false);
 
     // Attributes for transaksi_pencairan
     console.log("Setting up attributes for transaksi_pencairan...");
-    await createStringAttr("transaksi_pencairan", "desa_id", 50, true);
-    await createStringAttr("transaksi_pencairan", "jenis_dana", 50, true);
+    await createStringAttr("transaksi_pencairan", "desa_id", 50, false);
+    await createStringAttr("transaksi_pencairan", "pagu", 50, false);
+    await createStringAttr("transaksi_pencairan", "pagu_id", 50, false);
+    await createStringAttr("transaksi_pencairan", "jenis_dana", 50, false);
     await createStringAttr("transaksi_pencairan", "bulan_penyaluran", 20, false);
     await createStringAttr("transaksi_pencairan", "tahap_ke", 50, false);
     await createStringAttr("transaksi_pencairan", "keterangan", 255, false);
-    await createFloatAttr("transaksi_pencairan", "nominal_pengajuan", true);
+    await createFloatAttr("transaksi_pencairan", "nominal_pengajuan", false);
     await createFloatAttr("transaksi_pencairan", "potongan_bpjs", false);
-    await createFloatAttr("transaksi_pencairan", "nominal_net", true);
+    await createFloatAttr("transaksi_pencairan", "nominal_net", false);
+    await createFloatAttr("transaksi_pencairan", "nominal_pencairan_net", false);
     await createStringAttr("transaksi_pencairan", "no_rekomendasi", 100, false);
-    await createStringAttr("transaksi_pencairan", "status", 50, true);
+    await createStringAttr("transaksi_pencairan", "status", 50, false);
+    await createStringAttr("transaksi_pencairan", "status_verifikasi", 50, false);
     await createStringAttr("transaksi_pencairan", "file_kuitansi_id", 50, false);
     await createStringAttr("transaksi_pencairan", "hasil_ocr", 5000, false);
 

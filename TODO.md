@@ -17,15 +17,25 @@ Tracking eksekusi tugas berdasarkan `ROADMAP.md` (Post-Audit Revisi 2).
 
 ---
 
-## 🔴 Fase 2B: Fix Blocker & Security (P1 - Paralel) — IN PROGRESS
-- [ ] **Task 2B.1: Sinkronisasi Skema Atribut Appwrite DB**
-- [ ] **Task 2B.2: Fix Kontrak Data OCR + Redeploy Worker RunPod**
-- [ ] **Task 2B.3: Implementasi Auth & RBAC Middleware API**
-- [ ] **Task 2B.4: Migrasi API Mock (ADD/BHPR/BKK) ke Appwrite**
+## 🔴 Fase 2B: Fix Blocker & Security (P1 - Paralel) — ✅ COMPLETED
+- [x] **Task 2B.1: Sinkronisasi Skema Atribut Appwrite DB**
+  - [x] Audit nama atribut di seluruh repo (`status_verifikasi`, `nominal_pencairan_net`, `desa_id`, `pagu`)
+  - [x] Update `scripts/setup-appwrite-add.ts` dan `scripts/setup-appwrite-staging.ts` dengan atribut standar dan alias
+  - [x] Harmonikkan kueri di `api/transactions`, `api/kuitansi`, `api/add/rekap-spm`
+- [x] **Task 2B.2: Fix Kontrak Data OCR + Worker RunPod**
+  - [x] Update `runpod-ocr-worker/handler.py` dan `worker-repo/handler.py` mengembalikan objek array multi-desa + metadata (`metadata_sumber_dana`, `metadata_no_surat`, array `data`)
+- [x] **Task 2B.3: Implementasi Auth & RBAC Middleware API**
+  - [x] Implementasi `src/lib/authMiddleware.ts` pendukung verifikasi token session & 5 role RBAC
+  - [x] Pasang `verifyAuth` pada seluruh endpoint `/api/add`, `/api/bhpr`, `/api/bkk`, `/api/kuitansi`, `/api/kuitansi/print`, `/api/add/import-bpjs`, `/api/add/rekap-spm`
+- [x] **Task 2B.4: Migrasi API Mock (ADD/BHPR/BKK) ke Appwrite**
+  - [x] Ubah `/api/add/route.ts` menjadi live query & write Appwrite DB
+  - [x] Ubah `/api/bhpr/route.ts` menjadi live query & write Appwrite DB
+  - [x] Ubah `/api/bkk/route.ts` menjadi live query & write Appwrite DB
+  - [x] Verifikasi `npm run build` sukses 100% tanpa error TypeScript/Next.js
 
 ---
 
-## 🟡 Fase 3: Integrasi Fitur AI & Real Workflows (P2) — PENDING
+## 🟡 Fase 3: Integrasi Fitur AI & Real Workflows (P2) — IN PROGRESS
 - [ ] **Task 3.1: AI Policy Compiler Real (Rules-as-Code)**
 - [ ] **Task 3.2: Dual-Engine & Zod Schema Guardrail**
 - [ ] **Task 3.3: Server-Side Excel Ingestion Parser**

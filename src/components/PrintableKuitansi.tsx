@@ -9,6 +9,7 @@ export interface KuitansiData {
   keterangan: string;
   tahun: string;
   noRekening: string;
+  noRekomendasi?: string;
 }
 
 interface Props {

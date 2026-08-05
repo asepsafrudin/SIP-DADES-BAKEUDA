@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { Client, Databases, Query, ID } from 'node-appwrite';
 import * as xlsx from 'xlsx';
 
+import { verifyAuth } from '@/lib/authMiddleware';
+
 export const maxDuration = 180;
 
 const client = new Client()
@@ -13,6 +15,9 @@ const databases = new Databases(client);
 const DB_ID = "sipdades_db";
 
 export async function POST(req: NextRequest) {
+  const auth = await verifyAuth(req, ['SUPER_ADMIN', 'BAKEUDA']);
+  if (!auth.authorized) return auth.response!;
+
   try {
     const formData = await req.formData();
     const file = formData.get('file') as File | null;

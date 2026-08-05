@@ -24,7 +24,12 @@ const fonts = {
 // Actually in nodejs environment without custom fonts, it's better to use standard fonts provided by pdfmake or just provide path to standard TTF.
 // pdfmake standard fonts usually require path to file. Let's use standard fonts fallback.
 
+import { verifyAuth } from '@/lib/authMiddleware';
+
 export async function GET(req: NextRequest) {
+  const auth = await verifyAuth(req, ['SUPER_ADMIN', 'BAKEUDA', 'DINSOS', 'KECAMATAN', 'DESA']);
+  if (!auth.authorized) return auth.response!;
+
   try {
     const { searchParams } = new URL(req.url);
     const bulan = searchParams.get('bulan'); // e.g. "Agustus 2026"
@@ -41,16 +46,20 @@ export async function GET(req: NextRequest) {
       if(dbs.total > 0) activeDbId = dbs.databases[0].$id;
     }
 
-    // Ambil data transaksi pencairan untuk bulan tersebut yang disetujui
+    // Ambil data transaksi pencairan untuk bulan tersebut
     const pencairanResponse = await databases.listDocuments(activeDbId, 'transaksi_pencairan', [
       Query.equal('jenis_dana', 'ADD'),
       Query.equal('bulan_penyaluran', bulan),
-      Query.equal('status', 'DISETUJUI'),
       Query.limit(300)
     ]);
 
-    if (pencairanResponse.total === 0) {
-       return NextResponse.json({ error: 'Tidak ada data pencairan ADD yang disetujui untuk bulan ini' }, { status: 404 });
+    // Filter status DISETUJUI atau DRAFT/DICETAK
+    const validTrx = pencairanResponse.documents.filter(
+      d => d.status === 'DISETUJUI' || d.status_verifikasi === 'DISETUJUI' || d.status_verifikasi === 'DRAFT' || d.status === 'DRAFT'
+    );
+
+    if (validTrx.length === 0) {
+       return NextResponse.json({ error: 'Tidak ada data pencairan ADD untuk bulan ini' }, { status: 404 });
     }
 
     // Ambil data master desa
@@ -76,11 +85,11 @@ export async function GET(req: NextRequest) {
     let totalPenyaluran = 0;
 
     let idx = 1;
-    for (const trx of pencairanResponse.documents) {
-      const desa = masterDesaMap.get(trx.desa_id) || { nama_desa: 'Tidak Diketahui', no_rekening: '-' };
+    for (const trx of validTrx) {
+      const desa = masterDesaMap.get(trx.desa_id || trx.desa) || { nama_desa: 'Tidak Diketahui', no_rekening: '-' };
       const pagu = trx.nominal_pengajuan || 0;
       const bpjs = trx.potongan_bpjs || 0;
-      const net = trx.nominal_net || 0;
+      const net = trx.nominal_pencairan_net || trx.nominal_net || 0;
 
       totalPagu += pagu;
       totalPotongan += bpjs;
@@ -154,7 +163,7 @@ export async function GET(req: NextRequest) {
     const chunks: Buffer[] = [];
     pdfDoc.on('data', (chunk: Buffer) => chunks.push(chunk));
     
-    return new Promise((resolve) => {
+    return new Promise<NextResponse>((resolve) => {
       pdfDoc.on('end', () => {
         const result = Buffer.concat(chunks);
         resolve(new NextResponse(result, {

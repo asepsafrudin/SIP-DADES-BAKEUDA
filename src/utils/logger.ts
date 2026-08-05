@@ -18,7 +18,7 @@ const formatLog = (level: LogLevel, context: string, message: string, data?: unk
     timestamp: new Date().toISOString(),
     context,
     message,
-    ...(data && { data })
+    ...(data !== undefined ? { data } : {})
   };
   return JSON.stringify(payload);
 };

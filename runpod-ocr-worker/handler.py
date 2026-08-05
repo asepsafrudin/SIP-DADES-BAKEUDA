@@ -18,12 +18,25 @@ def process_document(image_base64):
     
     return {
         "status": "success",
+        "raw_text": "SURAT REKOMENDASI PENCAIRAN DANA DESA KABUPATEN PURBALINGGA TA 2026...",
         "data": {
-            "nomor_kuitansi": "B-001/BAK/2026",
-            "tanggal": "2026-07-28",
-            "nominal": 15000000,
-            "terbilang": "Lima Belas Juta Rupiah",
-            "penerima": "Desa Karanganyar"
+            "metadata_sumber_dana": "ADD",
+            "metadata_tahun_anggaran": "2026",
+            "metadata_no_surat": "900/141/2026",
+            "data": [
+                {
+                    "nama_desa": "PANICAN Kec. Kemangkon",
+                    "kegiatan": "Penyaluran Alokasi Dana Desa (ADD) Tahap I",
+                    "nominal": 15000000,
+                    "no_rekening": "3122061417"
+                },
+                {
+                    "nama_desa": "BOKOL Kec. Kemangkon",
+                    "kegiatan": "Penyaluran Alokasi Dana Desa (ADD) Tahap I",
+                    "nominal": 12500000,
+                    "no_rekening": "3122061418"
+                }
+            ]
         }
     }
 

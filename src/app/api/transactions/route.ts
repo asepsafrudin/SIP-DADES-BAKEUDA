@@ -43,9 +43,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Sumber Dana dan Tahun wajib diisi' }, { status: 400 });
     }
 
-    const results = [];
-    const errors = [];
-
     // Proses simpan data (Parallel)
     const promises = data.map(async (item: TransactionItem) => {
       // 1. Parsing Nama Desa & Kecamatan dari teks OCR (Contoh: "Panican Kec. Kemangkon")
@@ -124,11 +121,16 @@ export async function POST(req: NextRequest) {
         'transaksi_pencairan', 
         ID.unique(),
         {
+          desa_id: desaId,
+          pagu: paguId,
+          pagu_id: paguId,
           tahap_ke: "Rekomendasi Scanner", 
+          nominal_pengajuan: item.nominal,
+          nominal_net: item.nominal,
           nominal_pencairan_net: item.nominal,
           keterangan: item.kegiatan,
+          status: "DRAFT",
           status_verifikasi: "DRAFT",
-          pagu: paguId,
           no_rekomendasi: no_surat || ''
         }
       );

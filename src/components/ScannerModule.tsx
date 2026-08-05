@@ -75,8 +75,9 @@ export default function ScannerModule() {
 
       await page.render({
         canvasContext: context,
-        viewport: viewport
-      }).promise;
+        viewport: viewport,
+        canvas: canvas
+      } as any).promise;
 
       images.push(canvas.toDataURL('image/jpeg', 0.8));
     }
