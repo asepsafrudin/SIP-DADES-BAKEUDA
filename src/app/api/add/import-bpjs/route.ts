@@ -80,10 +80,41 @@ export async function POST(req: NextRequest) {
     let failedCount = 0;
     const failedDesa = [];
 
+function levenshteinDistance(str1: string, str2: string): number {
+  const track = Array(str2.length + 1).fill(null).map(() => Array(str1.length + 1).fill(null));
+  for (let i = 0; i <= str1.length; i += 1) track[0][i] = i;
+  for (let j = 0; j <= str2.length; j += 1) track[j][0] = j;
+  for (let j = 1; j <= str2.length; j += 1) {
+    for (let i = 1; i <= str1.length; i += 1) {
+      const indicator = str1[i - 1] === str2[j - 1] ? 0 : 1;
+      track[j][i] = Math.min(
+        track[j][i - 1] + 1,
+        track[j - 1][i] + 1,
+        track[j - 1][i - 1] + indicator,
+      );
+    }
+  }
+  return track[str2.length][str1.length];
+}
+
     // Save to Appwrite
     for (const [desaName, totals] of Array.from(villageTotals.entries())) {
-      const desaId = masterDesaMap.get(desaName);
+      let desaId = masterDesaMap.get(desaName);
       
+      // Fuzzy Levenshtein match fallback if exact match not found
+      if (!desaId) {
+        let bestMatchId: string | null = null;
+        let minDistance = 999;
+        for (const [masterName, id] of Array.from(masterDesaMap.entries())) {
+          const dist = levenshteinDistance(desaName, masterName);
+          if (dist < minDistance && dist <= 3) {
+            minDistance = dist;
+            bestMatchId = id;
+          }
+        }
+        if (bestMatchId) desaId = bestMatchId;
+      }
+
       if (!desaId) {
         failedCount++;
         failedDesa.push(desaName);

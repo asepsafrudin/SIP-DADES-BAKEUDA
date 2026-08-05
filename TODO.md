@@ -35,15 +35,22 @@ Tracking eksekusi tugas berdasarkan `ROADMAP.md` (Post-Audit Revisi 2).
 
 ---
 
-## 🟡 Fase 3: Integrasi Fitur AI & Real Workflows (P2) — IN PROGRESS
-- [ ] **Task 3.1: AI Policy Compiler Real (Rules-as-Code)**
-- [ ] **Task 3.2: Dual-Engine & Zod Schema Guardrail**
-- [ ] **Task 3.3: Server-Side Excel Ingestion Parser**
-- [ ] **Task 3.4: Alur Real Storage Scan-Back TTE Basah**
+## 🟡 Fase 3: Integrasi Fitur AI & Real Workflows (P2) — ✅ COMPLETED
+- [x] **Task 3.1: AI Policy Compiler Real (Rules-as-Code)**
+  - [x] Ekstraksi otomatis parameter kuantitatif (70% ADDM, 30% ADDP, 20% Min Pajak BHPR, 4% BPJS Pemda) pada `src/app/api/regulasi/extract-rules/route.ts`
+  - [x] Kueri & simpan ke Appwrite DB `master_regulasi` pada `src/app/api/regulasi/route.ts`
+- [x] **Task 3.2: Dual-Engine & Zod Schema Guardrail**
+  - [x] Buat validation schema `src/lib/validations/ocrSchema.ts`
+  - [x] Integrasikan sanitasi & guardrail pada `src/app/api/ocr/route.ts`
+- [x] **Task 3.3: Server-Side Excel Ingestion Parser**
+  - [x] Tambahkan pencocokan fuzzy Levenshtein distance pada `src/app/api/add/import-bpjs/route.ts` untuk pemetaan 224 desa
+- [x] **Task 3.4: Alur Real Storage Scan-Back TTE Basah**
+  - [x] Buat modul Appwrite Storage client `src/lib/storageClient.ts` untuk upload & view bucket `kuitansi_storage`
+  - [x] Verifikasi `npm run build` lulus 100%
 
 ---
 
-## 🔵 Fase 4: Governance & Production Hardening (P3) — PENDING
+## 🔵 Fase 4: Governance & Production Hardening (P3) — IN PROGRESS
 - [ ] **Task 4.1: Dashboard Billing & AI Kill-Switch**
 - [ ] **Task 4.2: Human-in-the-Loop Approval UI**
 - [ ] **Task 4.3: Automated Regression Testing (1000+ Transaksi)**

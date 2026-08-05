@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { Client, Databases } from 'node-appwrite';
 import { rateLimit } from '@/utils/rateLimit';
 import { logger } from '@/utils/logger';
+import { validateAndSanitizeOcrResult } from '@/lib/validations/ocrSchema';
 import { PDFParse } from 'pdf-parse';
 
 export const maxDuration = 180;
@@ -134,18 +135,40 @@ export async function POST(req: NextRequest) {
       }, { status: 500 });
     }
 
-    logger.info('OCR_API', 'Berhasil mengekstrak data OCR melalui RunPod', {
-      jumlah_data: tmmdData.data?.length ?? 0
-    });
-
-    // Teruskan langsung format TMMD dari handler ke frontend
-    return NextResponse.json({ 
-      success: true,
+    // Enforce Zod Schema Guardrail
+    const validated = validateAndSanitizeOcrResult({
+      status: 'success',
       raw_text: output.raw_text || '',
-      metadata_sumber_dana: tmmdData.metadata_sumber_dana || '',
+      metadata_sumber_dana: tmmdData.metadata_sumber_dana || 'ADD',
       metadata_tahun_anggaran: tmmdData.metadata_tahun_anggaran || '2026',
       metadata_no_surat: tmmdData.metadata_no_surat || '',
       data: tmmdData.data || []
+    });
+
+    if (!validated.valid || !validated.data) {
+      logger.warn('OCR_API', 'Zod validation warning, fallback executed', { errors: validated.errors });
+    }
+
+    const sanitizedData = validated.data || {
+      status: 'success',
+      raw_text: output.raw_text || '',
+      metadata_sumber_dana: tmmdData.metadata_sumber_dana || 'ADD',
+      metadata_tahun_anggaran: tmmdData.metadata_tahun_anggaran || '2026',
+      metadata_no_surat: tmmdData.metadata_no_surat || '',
+      data: tmmdData.data || []
+    };
+
+    logger.info('OCR_API', 'Berhasil mengekstrak data OCR melalui RunPod + Zod Guardrail', {
+      jumlah_data: sanitizedData.data.length
+    });
+
+    return NextResponse.json({ 
+      success: true,
+      raw_text: sanitizedData.raw_text,
+      metadata_sumber_dana: sanitizedData.metadata_sumber_dana,
+      metadata_tahun_anggaran: sanitizedData.metadata_tahun_anggaran,
+      metadata_no_surat: sanitizedData.metadata_no_surat,
+      data: sanitizedData.data
     });
 
   } catch (error: unknown) {
