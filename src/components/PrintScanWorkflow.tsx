@@ -38,19 +38,32 @@ export default function PrintScanWorkflow({
     e: React.ChangeEvent<HTMLInputElement>
   ) => {
     if (!e.target.files || e.target.files.length === 0) return;
+    const file = e.target.files[0];
     setIsUploading(true);
 
     try {
-      // Simulate file upload and QR verification
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      const formData = new FormData();
+      formData.append('transaction_id', transactionId);
+      formData.append('file', file);
+
+      const res = await fetch('/api/transactions/upload-scan', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const json = await res.json();
+      if (!res.ok) {
+        throw new Error(json.error || 'Gagal mengunggah dokumen.');
+      }
+
       const nextStatus = 'CAIR';
       setStatus(nextStatus);
       if (onStatusChange) onStatusChange(nextStatus);
       alert(
-        '✅ Dokumen hasil scan TTE basah berhasil diverifikasi! Status transaksi diperbarui menjadi CAIR.'
+        `✅ ${json.message || 'Dokumen scan TTE basah berhasil diverifikasi! Status transaksi diperbarui menjadi CAIR.'}`
       );
-    } catch {
-      alert('❌ Gagal memproses dokumen hasil scan.');
+    } catch (err: any) {
+      alert(`❌ Gagal memproses dokumen hasil scan: ${err.message}`);
     } finally {
       setIsUploading(false);
       e.target.value = '';

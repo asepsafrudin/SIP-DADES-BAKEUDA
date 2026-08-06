@@ -3,10 +3,12 @@
 import React, { useState } from 'react';
 import SidebarLayout from '@/components/layout/SidebarLayout';
 import { useAddTransactions } from '@/hooks/useAddTransactions';
+import PrintScanWorkflow from '@/components/PrintScanWorkflow';
 
 export default function DashboardAddPage() {
   const [selectedBulan, setSelectedBulan] = useState('Agustus 2026');
   const { data, loading, error, refetch, updateStatus } = useAddTransactions(selectedBulan);
+  const [expandedRow, setExpandedRow] = useState<string | null>(null);
   
   const [isUploadingOCR, setIsUploadingOCR] = useState(false);
   const [isUploadingBPJS, setIsUploadingBPJS] = useState(false);
@@ -162,38 +164,63 @@ export default function DashboardAddPage() {
                   <tr><td colSpan={6} className="px-6 py-8 text-center text-slate-400">Belum ada transaksi untuk bulan ini.</td></tr>
                 ) : (
                   data.map((row) => (
-                    <tr key={row.$id} className="hover:bg-slate-50/50 transition-colors">
-                      <td className="px-6 py-4 font-medium text-slate-800">{row.desa_id}</td>
-                      <td className="px-6 py-4">
-                        <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${
-                          row.status_verifikasi === 'DISETUJUI' ? 'bg-green-100 text-green-700' :
-                          row.status_verifikasi === 'DITOLAK' ? 'bg-red-100 text-red-700' :
-                          'bg-amber-100 text-amber-700'
-                        }`}>
-                          {row.status_verifikasi}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4">{row.nominal_pengajuan?.toLocaleString('id-ID') || 0}</td>
-                      <td className="px-6 py-4 text-red-500">{row.potongan_bpjs?.toLocaleString('id-ID') || 0}</td>
-                      <td className="px-6 py-4 font-semibold text-slate-800">{row.nominal_pencairan_net?.toLocaleString('id-ID') || 0}</td>
-                      <td className="px-6 py-4 text-center">
-                        {row.status_verifikasi !== 'DISETUJUI' && (
-                          <button 
-                            onClick={async () => {
-                              try {
-                                await updateStatus(row.$id, 'DISETUJUI');
-                                alert('Persetujuan berhasil diproses!');
-                              } catch (err: any) {
-                                alert(`PERINGATAN REGULASI:\n\n${err.message}`);
-                              }
-                            }}
-                            className="text-white bg-green-500 hover:bg-green-600 text-xs px-3 py-1.5 rounded-lg font-medium transition-colors"
-                          >
-                            Setujui
-                          </button>
-                        )}
-                      </td>
-                    </tr>
+                    <React.Fragment key={row.$id}>
+                      <tr 
+                        className="hover:bg-slate-50/50 transition-colors cursor-pointer"
+                        onClick={() => setExpandedRow(expandedRow === row.$id ? null : row.$id)}
+                      >
+                        <td className="px-6 py-4 font-medium text-slate-800">
+                          <span className="text-xs text-slate-400 mr-2">{expandedRow === row.$id ? '▼' : '▶'}</span>
+                          {row.desa_id}
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${
+                            row.status_verifikasi === 'CAIR' ? 'bg-emerald-100 text-emerald-700' :
+                            row.status_verifikasi === 'DISETUJUI' ? 'bg-green-100 text-green-700' :
+                            row.status_verifikasi === 'DITOLAK' ? 'bg-red-100 text-red-700' :
+                            'bg-amber-100 text-amber-700'
+                          }`}>
+                            {row.status_verifikasi}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">{row.nominal_pengajuan?.toLocaleString('id-ID') || 0}</td>
+                        <td className="px-6 py-4 text-red-500">{row.potongan_bpjs?.toLocaleString('id-ID') || 0}</td>
+                        <td className="px-6 py-4 font-semibold text-slate-800">{row.nominal_pencairan_net?.toLocaleString('id-ID') || 0}</td>
+                        <td className="px-6 py-4 text-center" onClick={(e) => e.stopPropagation()}>
+                          {row.status_verifikasi !== 'DISETUJUI' && row.status_verifikasi !== 'CAIR' && (
+                            <button 
+                              onClick={async () => {
+                                try {
+                                  await updateStatus(row.$id, 'DISETUJUI');
+                                  alert('Persetujuan berhasil diproses!');
+                                } catch (err: any) {
+                                  alert(`PERINGATAN REGULASI:\n\n${err.message}`);
+                                }
+                              }}
+                              className="text-white bg-green-500 hover:bg-green-600 text-xs px-3 py-1.5 rounded-lg font-medium transition-colors"
+                            >
+                              Setujui
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                      {expandedRow === row.$id && (
+                        <tr>
+                          <td colSpan={6} className="bg-slate-50/50 p-6 border-y border-slate-100">
+                            <PrintScanWorkflow
+                              transactionId={row.$id}
+                              desaName={row.desa_id}
+                              bulan={selectedBulan}
+                              nominal={row.nominal_pengajuan}
+                              initialStatus={row.status_verifikasi}
+                              onStatusChange={() => {
+                                refetch();
+                              }}
+                            />
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
                   ))
                 )}
               </tbody>
