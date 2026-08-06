@@ -50,6 +50,7 @@ export async function GET(request: NextRequest) {
     try {
       const res = await databases.listDocuments(DB_ID, 'master_regulasi', [
         Query.equal('tahun_anggaran', Number(tahun)),
+        Query.equal('is_active', true),
         Query.limit(1)
       ]);
 

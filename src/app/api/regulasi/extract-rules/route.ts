@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyAuth } from '@/lib/authMiddleware';
 import { logger } from '@/utils/logger';
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { callMcpTool } from '@/lib/mcpClient';
+import { searchRag } from '@/lib/ragClient';
 
 /**
  * AI Regulatory Rule Extractor API — Gemini-Powered (Fix 3.1)
@@ -42,27 +42,7 @@ export async function POST(request: NextRequest) {
     let ragContext = '';
     try {
       const queryText = extracted_text.slice(0, 300).replace(/\r?\n|\r/g, ' ');
-      logger.info('AI_POLICY_COMPILER', `Querying RAG for background context: "${queryText.slice(0, 80)}..."`);
-      
-      const ragResult = await callMcpTool('knowledge_search', {
-        namespace: 'purbalingga_legal',
-        query: queryText
-      });
-      
-      if (ragResult && ragResult.success && ragResult.context) {
-        ragContext = ragResult.context;
-        logger.info('AI_POLICY_COMPILER', 'RAG context successfully loaded from purbalingga_legal.');
-      } else {
-        // Try fallback namespace bakeuda_internal
-        const backupResult = await callMcpTool('knowledge_search', {
-          namespace: 'bakeuda_internal',
-          query: queryText
-        });
-        if (backupResult && backupResult.success && backupResult.context) {
-          ragContext = backupResult.context;
-          logger.info('AI_POLICY_COMPILER', 'RAG context successfully loaded from bakeuda_internal.');
-        }
-      }
+      ragContext = await searchRag(queryText, 'purbalingga_legal');
     } catch (err: any) {
       logger.warn('AI_POLICY_COMPILER', `RAG query failed or timed out: ${err.message}. Proceeding without RAG context.`);
     }

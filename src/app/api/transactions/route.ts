@@ -217,6 +217,7 @@ export async function PATCH(req: NextRequest) {
       try {
         const regRes = await databases.listDocuments(DB_ID, 'master_regulasi', [
           Query.equal('tahun_anggaran', tahunAnggaran),
+          Query.equal('is_active', true),
           Query.limit(1)
         ]);
         if (regRes.total > 0 && regRes.documents[0].rules_json) {

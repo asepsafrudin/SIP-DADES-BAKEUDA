@@ -117,17 +117,17 @@ Tracking eksekusi tugas berdasarkan `ROADMAP.md` (Post-Audit Revisi 2).
 
 ---
 
-## 🟡 Fase 7: Sprint 2 — AI AGENTIC & RAG (Revisi ke-3) — ⏳ PENDING
-- [ ] **Task 7.1: RAG Pipeline Minimal — Ingest 3 Dokumen Kritis (Sprint 2, Hari 8–10)**
-  - [ ] Buat script ingestion `scripts/rag-ingest.ts` dan client `src/lib/ragClient.ts`
-  - [ ] Ingest 3 dokumen kritis ke PostgreSQL + pgvector (namespace `purbalingga_legal`)
-- [ ] **Task 7.2: AI Policy Compiler — Integrasi RAG Context (Sprint 2, Hari 10–12)**
-  - [ ] Ambil konteks dari RAG sebelum memanggil Gemini di `/api/regulasi/extract-rules`
-  - [ ] Pastikan fallback ke Gemini biasa tanpa konteks jika RAG offline
-- [ ] **Task 7.3: Human-in-the-Loop UI — Approval Dashboard (Sprint 2, Hari 12–14)**
-  - [ ] Buat halaman dashboard approval di `src/app/admin/regulasi-approval/page.tsx`
-  - [ ] Catat log persetujuan ke `AUDIT_LOG_REGULASI`
-  - [ ] Pastikan regulasi baru tidak aktif di production tanpa persetujuan eksplisit
-- [ ] **Task 7.4: Regression Test Suite — 1000+ Transaksi Historis (Sprint 2, Hari 13–14)**
-  - [ ] Buat unit test `tests/regression/transaction-rules.test.ts` dengan minimal 10 test case otomatis
-  - [ ] Integrasikan test ini ke CI pipeline
+## 🟡 Fase 7: Sprint 2 — AI AGENTIC & RAG (Revisi ke-3) — ✅ COMPLETED
+- [x] **Task 7.1: RAG Pipeline Minimal — Ingest 3 Dokumen Kritis (Sprint 2, Hari 8–10)**
+  - [x] Buat script ingestion `scripts/rag-ingest.ts` dan client `src/lib/ragClient.ts`
+  - [x] Ingest 3 dokumen kritis ke PostgreSQL + pgvector (namespace `purbalingga_legal`)
+- [x] **Task 7.2: AI Policy Compiler — Integrasi RAG Context (Sprint 2, Hari 10–12)**
+  - [x] Ambil konteks dari RAG sebelum memanggil Gemini di `/api/regulasi/extract-rules`
+  - [x] Pastikan fallback ke Gemini biasa tanpa konteks jika RAG offline
+- [x] **Task 7.3: Human-in-the-Loop UI — Approval Dashboard (Sprint 2, Hari 12–14)**
+  - [x] Buat halaman dashboard approval di `src/app/admin/regulasi-approval/page.tsx`
+  - [x] Catat log persetujuan ke `AUDIT_LOG_REGULASI`
+  - [x] Pastikan regulasi baru tidak aktif di production tanpa persetujuan eksplisit
+- [x] **Task 7.4: Regression Test Suite — 1000+ Transaksi Historis (Sprint 2, Hari 13–14)**
+  - [x] Buat unit test `tests/regression/transaction-rules.test.ts` dengan minimal 10 test case otomatis
+  - [x] Integrasikan test ini ke CI pipeline
