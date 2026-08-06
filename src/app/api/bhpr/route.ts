@@ -31,15 +31,15 @@ export async function GET(request: NextRequest) {
     const desaMap = new Map(masterDesaRes.documents.map(d => [d.$id, d]));
 
     const formattedData = res.documents.map(doc => {
-      const desaObj = desaMap.get(doc.desa_id || doc.desa);
+      const desaObj = desaMap.get(doc.desa_id);
       return {
         id: doc.$id,
         desa: desaObj ? desaObj.nama_desa : (doc.desa_id || 'Tidak Diketahui'),
         kecamatan: desaObj ? desaObj.kecamatan : 'Kertanegara',
         no_rek: desaObj ? (desaObj.no_rekening || '-') : '-',
         pagu_total: doc.nominal_pengajuan || 0,
-        nominal_tahap_1: doc.nominal_pencairan_net || doc.nominal_net || 0,
-        status: doc.status_verifikasi || doc.status || 'DRAFT'
+        nominal_tahap_1: doc.nominal_pencairan_net || 0,
+        status_verifikasi: doc.status_verifikasi || 'DRAFT'
       };
     });
 

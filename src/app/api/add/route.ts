@@ -37,13 +37,13 @@ export async function GET(request: NextRequest) {
 
     const formattedData = res.documents.map(doc => ({
       id: doc.$id,
-      desa_id: desaMap.get(doc.desa_id || doc.desa) || doc.desa_id || 'Tidak Diketahui',
+      desa_id: desaMap.get(doc.desa_id) || doc.desa_id || 'Tidak Diketahui',
       bulan_penyaluran: doc.bulan_penyaluran || 'Agustus 2026',
       jenis_dana: doc.jenis_dana,
       nominal_pengajuan: doc.nominal_pengajuan || 0,
       potongan_bpjs: doc.potongan_bpjs || 0,
-      nominal_net: doc.nominal_pencairan_net || doc.nominal_net || 0,
-      status: doc.status_verifikasi || doc.status || 'DRAFT',
+      nominal_pencairan_net: doc.nominal_pencairan_net || 0,
+      status_verifikasi: doc.status_verifikasi || 'DRAFT',
       no_rekomendasi: doc.no_rekomendasi || ''
     }));
 
@@ -79,11 +79,9 @@ export async function POST(request: NextRequest) {
       bulan_penyaluran: bulan_penyaluran || 'Agustus 2026',
       nominal_pengajuan: Number(nominal_pengajuan),
       potongan_bpjs: Number(potongan_bpjs) || 0,
-      nominal_net: netNominal,
       nominal_pencairan_net: netNominal,
       keterangan: keterangan || 'Penyaluran ADD Bulanan',
       no_rekomendasi: no_rekomendasi || '',
-      status: 'DRAFT',
       status_verifikasi: 'DRAFT'
     });
 

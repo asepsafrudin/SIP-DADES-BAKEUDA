@@ -1,11 +1,12 @@
 import { logger } from '@/utils/logger';
 
-const MCP_SSE_URL = 'http://127.0.0.1:8000/sse';
+const MCP_SERVER_URL = process.env.MCP_SERVER_URL || 'http://127.0.0.1:8000';
+const MCP_SSE_URL = `${MCP_SERVER_URL}/sse`;
 
 /**
  * Panggil tool dari local persistent MCP server via SSE + POST JSON-RPC
  */
-export async function callMcpTool(toolName: string, args: any = {}): Promise<any> {
+async function callMcpToolRaw(toolName: string, args: any = {}): Promise<any> {
   logger.info('MCP_CLIENT', `Mengirim request call_tool: ${toolName}...`);
 
   let response: Response;
@@ -42,7 +43,7 @@ export async function callMcpTool(toolName: string, args: any = {}): Promise<any
       for (const line of lines) {
         if (line.startsWith('data: ')) {
           const dataPath = line.substring(6).trim();
-          endpointUrl = `http://127.0.0.1:8000${dataPath}`;
+          endpointUrl = `${MCP_SERVER_URL}${dataPath}`;
           break;
         }
       }
@@ -191,4 +192,19 @@ export async function callMcpTool(toolName: string, args: any = {}): Promise<any
   }
 
   throw new Error(`No response received from MCP server for request to call tool ${toolName}`);
+}
+
+export async function callMcpTool(toolName: string, args: any = {}): Promise<any> {
+  const maxRetries = Number(process.env.MCP_MAX_RETRIES) || 3;
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      return await callMcpToolRaw(toolName, args);
+    } catch (err: any) {
+      if (i === maxRetries - 1) throw err;
+      const delay = Math.pow(2, i) * 1000;
+      logger.warn('MCP_CLIENT', `Retry ${i + 1}/${maxRetries} after ${delay}ms for tool ${toolName} due to error: ${err.message}`);
+      await new Promise(r => setTimeout(r, delay));
+    }
+  }
+  throw new Error(`Max retries exceeded for tool ${toolName}`);
 }

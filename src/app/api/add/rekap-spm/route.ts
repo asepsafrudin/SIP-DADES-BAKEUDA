@@ -53,9 +53,9 @@ export async function GET(req: NextRequest) {
       Query.limit(300)
     ]);
 
-    // Filter status DISETUJUI atau DRAFT/DICETAK
+    // Filter status DISETUJUI atau DRAFT
     const validTrx = pencairanResponse.documents.filter(
-      d => d.status === 'DISETUJUI' || d.status_verifikasi === 'DISETUJUI' || d.status_verifikasi === 'DRAFT' || d.status === 'DRAFT'
+      d => d.status_verifikasi === 'DISETUJUI' || d.status_verifikasi === 'DRAFT'
     );
 
     if (validTrx.length === 0) {
@@ -86,10 +86,10 @@ export async function GET(req: NextRequest) {
 
     let idx = 1;
     for (const trx of validTrx) {
-      const desa = masterDesaMap.get(trx.desa_id || trx.desa) || { nama_desa: 'Tidak Diketahui', no_rekening: '-' };
+      const desa = masterDesaMap.get(trx.desa_id) || { nama_desa: 'Tidak Diketahui', no_rekening: '-' };
       const pagu = trx.nominal_pengajuan || 0;
       const bpjs = trx.potongan_bpjs || 0;
-      const net = trx.nominal_pencairan_net || trx.nominal_net || 0;
+      const net = trx.nominal_pencairan_net || 0;
 
       totalPagu += pagu;
       totalPotongan += bpjs;

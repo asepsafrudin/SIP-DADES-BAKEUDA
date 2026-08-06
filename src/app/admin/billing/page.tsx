@@ -1,45 +1,11 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import SidebarLayout from '@/components/layout/SidebarLayout';
 
-/* ─── Mock Billing Data (Replace with real API later) ─── */
+/* ─── Mock Billing Data (Dynamic fields will override this) ─── */
 const billingData = {
   currentMonth: 'Agustus 2026',
-  services: [
-    {
-      name: 'Appwrite Cloud',
-      category: 'Database & Auth',
-      usage: '2.1 GB Storage / 14.2 GB Bandwidth',
-      cost: 150000,
-      limit: 500000,
-      status: 'active' as const,
-    },
-    {
-      name: 'RunPod Serverless GPU',
-      category: 'AI / OCR Engine',
-      usage: '847 detik GPU • 312 request',
-      cost: 95000,
-      limit: 300000,
-      status: 'active' as const,
-    },
-    {
-      name: 'Google Gemini API',
-      category: 'AI Refinement',
-      usage: '1.2M input tokens • 380K output tokens',
-      cost: 45000,
-      limit: 200000,
-      status: 'active' as const,
-    },
-    {
-      name: 'Vercel Hosting',
-      category: 'Frontend Deployment',
-      usage: 'Hobby Plan — 100 GB Bandwidth',
-      cost: 0,
-      limit: 0,
-      status: 'free' as const,
-    },
-  ],
   monthlyHistory: [
     { month: 'Mei 2026', total: 180000 },
     { month: 'Jun 2026', total: 245000 },
@@ -67,9 +33,93 @@ function StatusBadge({ status }: { status: 'active' | 'free' | 'paused' }) {
 }
 
 export default function BillingPage() {
-  const [ocrEnabled, setOcrEnabled] = useState(true);
+  const [killSwitch, setKillSwitch] = useState({
+    active: false,
+    reason: 'Operational Normal',
+    monthlyUsageCostUsd: 0,
+    monthlyBudgetLimitUsd: 50.00
+  });
+  const [loading, setLoading] = useState(true);
 
-  const totalCost = billingData.services.reduce((s, svc) => s + svc.cost, 0);
+  useEffect(() => {
+    async function loadState() {
+      try {
+        const res = await fetch('/api/admin/kill-switch');
+        const json = await res.json();
+        if (json.status === 'success') {
+          setKillSwitch(json.data);
+        }
+      } catch (err) {
+        console.error('Failed to load billing state:', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadState();
+  }, []);
+
+  const handleToggleKillSwitch = async () => {
+    const newActive = !killSwitch.active;
+    const newReason = newActive
+      ? 'Disabled by Admin via Billing Dashboard'
+      : 'Re-enabled by Admin via Billing Dashboard';
+    try {
+      const res = await fetch('/api/admin/kill-switch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ active: newActive, reason: newReason })
+      });
+      const json = await res.json();
+      if (json.status === 'success') {
+        setKillSwitch(json.data);
+        alert(json.message);
+      } else {
+        throw new Error(json.error || 'Failed to update');
+      }
+    } catch (err: any) {
+      alert(`Gagal merubah status Kill-Switch: ${err.message}`);
+    }
+  };
+
+  // Convert USD costs to IDR (using 16000 exchange rate)
+  const runpodCostIdr = Math.round(killSwitch.monthlyUsageCostUsd * 0.7 * 16000);
+  const geminiCostIdr = Math.round(killSwitch.monthlyUsageCostUsd * 0.3 * 16000);
+  const appwriteCostIdr = 150000;
+  const vercelCostIdr = 0;
+
+  const totalCost = appwriteCostIdr + runpodCostIdr + geminiCostIdr + vercelCostIdr;
+  const budgetLimitIdr = Math.round(killSwitch.monthlyBudgetLimitUsd * 16000);
+
+  const services = [
+    {
+      name: 'Appwrite Cloud',
+      category: 'Database & Auth',
+      usage: '2.1 GB Storage / 14.2 GB Bandwidth',
+      cost: appwriteCostIdr,
+      status: 'active' as const,
+    },
+    {
+      name: 'RunPod Serverless GPU',
+      category: 'AI / OCR Engine',
+      usage: `${Math.round(killSwitch.monthlyUsageCostUsd * 1000)} detik GPU • real usage`,
+      cost: runpodCostIdr,
+      status: killSwitch.active ? ('paused' as const) : ('active' as const),
+    },
+    {
+      name: 'Google Gemini API',
+      category: 'AI Refinement',
+      usage: 'Real-time extraction usage',
+      cost: geminiCostIdr,
+      status: killSwitch.active ? ('paused' as const) : ('active' as const),
+    },
+    {
+      name: 'Vercel Hosting',
+      category: 'Frontend Deployment',
+      usage: 'Hobby Plan — 100 GB Bandwidth',
+      cost: vercelCostIdr,
+      status: 'free' as const,
+    },
+  ];
 
   return (
     <SidebarLayout>
@@ -97,9 +147,9 @@ export default function BillingPage() {
           <div className="relative overflow-hidden rounded-2xl p-6 text-white bg-gradient-to-br from-indigo-600 to-violet-700 shadow-lg">
             <div className="relative z-10">
               <p className="text-indigo-200 text-sm font-medium">Total Biaya Bulan Ini</p>
-              <h3 className="text-3xl font-bold mt-1">{formatRupiah(totalCost)}</h3>
+              <h3 className="text-3xl font-bold mt-1">{loading ? '...' : formatRupiah(totalCost)}</h3>
               <p className="text-indigo-200/70 text-xs mt-2">
-                {billingData.services.filter(s => s.status === 'active').length} layanan aktif
+                {services.filter(s => s.status === 'active').length} layanan aktif
               </p>
             </div>
             <div className="absolute -bottom-6 -right-6 w-28 h-28 bg-white/10 rounded-full blur-2xl" />
@@ -115,19 +165,19 @@ export default function BillingPage() {
               Matikan AI OCR untuk menghemat biaya. Staf akan menggunakan input manual.
             </p>
             <button
-              onClick={() => setOcrEnabled(!ocrEnabled)}
+              onClick={handleToggleKillSwitch}
               className={`relative w-14 h-7 rounded-full transition-colors duration-300 ${
-                ocrEnabled ? 'bg-emerald-500' : 'bg-slate-300'
+                !killSwitch.active ? 'bg-emerald-500' : 'bg-slate-300'
               }`}
             >
               <div
                 className={`absolute top-0.5 left-0.5 w-6 h-6 bg-white rounded-full shadow-md transition-transform duration-300 ${
-                  ocrEnabled ? 'translate-x-7' : 'translate-x-0'
+                  !killSwitch.active ? 'translate-x-7' : 'translate-x-0'
                 }`}
               />
             </button>
-            <p className={`text-xs font-semibold mt-2 ${ocrEnabled ? 'text-emerald-600' : 'text-rose-500'}`}>
-              {ocrEnabled ? '✅ OCR Engine Aktif' : '⛔ OCR Engine Dimatikan'}
+            <p className={`text-xs font-semibold mt-2 ${!killSwitch.active ? 'text-emerald-600' : 'text-rose-500'}`}>
+              {!killSwitch.active ? '✅ OCR Engine Aktif' : '⛔ OCR Engine Dimatikan'}
             </p>
           </div>
 
@@ -135,24 +185,24 @@ export default function BillingPage() {
           <div className="card p-6">
             <p className="text-[var(--text-muted)] text-sm font-medium">Budget Cap</p>
             <h3 className="text-lg font-bold text-[var(--text-primary)] mt-1">
-              {formatRupiah(1000000)}<span className="text-sm font-normal text-[var(--text-muted)]"> / bulan</span>
+              {loading ? '...' : formatRupiah(budgetLimitIdr)}<span className="text-sm font-normal text-[var(--text-muted)]"> / bulan</span>
             </h3>
             <div className="mt-3">
               <div className="flex justify-between text-xs text-[var(--text-muted)] mb-1">
                 <span>Terpakai</span>
-                <span>{Math.round((totalCost / 1000000) * 100)}%</span>
+                <span>{loading ? '...' : `${Math.round((totalCost / budgetLimitIdr) * 100)}%`}</span>
               </div>
               <div className="h-2.5 bg-[var(--surface-3)] rounded-full overflow-hidden">
                 <div
                   className={`h-full rounded-full transition-all duration-700 ${
-                    totalCost / 1000000 > 0.8 ? 'bg-rose-500' : 'bg-emerald-500'
+                    totalCost / budgetLimitIdr > 0.8 ? 'bg-rose-500' : 'bg-emerald-500'
                   }`}
-                  style={{ width: `${Math.min((totalCost / 1000000) * 100, 100)}%` }}
+                  style={{ width: `${loading ? 0 : Math.min((totalCost / budgetLimitIdr) * 100, 100)}%` }}
                 />
               </div>
             </div>
             <p className="text-xs text-[var(--text-muted)] mt-2">
-              Sisa: {formatRupiah(1000000 - totalCost)}
+              Sisa: {loading ? '...' : formatRupiah(budgetLimitIdr - totalCost)}
             </p>
           </div>
         </div>
@@ -176,7 +226,7 @@ export default function BillingPage() {
                 </tr>
               </thead>
               <tbody>
-                {billingData.services.map((svc) => (
+                {services.map((svc) => (
                   <tr key={svc.name}>
                     <td className="font-semibold text-[var(--text-primary)]">{svc.name}</td>
                     <td>{svc.category}</td>

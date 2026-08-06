@@ -10,7 +10,7 @@ interface BhprRow {
   no_rek: string;
   pagu_total: number;
   nominal_tahap_1: number;
-  status: string;
+  status_verifikasi: string;
 }
 
 export default function BhprPage() {
@@ -186,7 +186,7 @@ export default function BhprPage() {
                       <td className="font-semibold text-amber-600">
                         {new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(row.nominal_tahap_1)}
                       </td>
-                      <td><span className="badge badge-success">{row.status}</span></td>
+                      <td><span className="badge badge-success">{row.status_verifikasi}</span></td>
                       <td className="text-center">
                         <button
                           onClick={() => window.open(`/api/print/generate-spm?desa=${encodeURIComponent(row.desa)}&bulan=Tahap+I+2026&nominal=${row.nominal_tahap_1}`, '_blank')}

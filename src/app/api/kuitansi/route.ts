@@ -27,9 +27,9 @@ export async function GET(req: NextRequest) {
       Query.limit(100)
     ]);
 
-    // Filter DRAFT documents (support status_verifikasi or status field)
+    // Filter DRAFT documents
     const draftDocs = transRes.documents.filter(
-      d => d.status_verifikasi === 'DRAFT' || d.status === 'DRAFT'
+      d => d.status_verifikasi === 'DRAFT'
     );
 
     const masterDesaRes = await databases.listDocuments(DB_ID, 'master_desa', [Query.limit(500)]);
@@ -43,7 +43,7 @@ export async function GET(req: NextRequest) {
         let tahunAnggaran = '2026';
 
         // Direct desa reference
-        const desaKey = doc.desa_id || doc.desa;
+        const desaKey = doc.desa_id;
         if (desaKey && desaMap.has(desaKey)) {
           desaDoc = desaMap.get(desaKey);
         }
@@ -56,7 +56,7 @@ export async function GET(req: NextRequest) {
             if (paguDoc) {
               tahunAnggaran = String(paguDoc.tahun_anggaran || '2026');
               if (!desaDoc) {
-                const desaFromPagu = typeof paguDoc.desa === 'object' ? paguDoc.desa.$id : (paguDoc.desa || paguDoc.desa_id);
+                const desaFromPagu = typeof paguDoc.desa === 'object' ? paguDoc.desa.$id : paguDoc.desa_id;
                 if (desaFromPagu && desaMap.has(desaFromPagu)) {
                   desaDoc = desaMap.get(desaFromPagu);
                 }
@@ -71,7 +71,7 @@ export async function GET(req: NextRequest) {
           id: doc.$id,
           namaDesa: desaDoc ? desaDoc.nama_desa : 'Kedungbenda',
           kecamatan: desaDoc ? desaDoc.kecamatan : 'Kemangkon',
-          nominal: doc.nominal_pencairan_net || doc.nominal_net || doc.nominal_pengajuan || 0,
+          nominal: doc.nominal_pencairan_net || 0,
           keterangan: doc.keterangan || 'Penyaluran Alokasi Dana Desa (ADD)',
           tahun: tahunAnggaran,
           noRekening: desaDoc ? (desaDoc.no_rekening || '00000000') : '00000000',

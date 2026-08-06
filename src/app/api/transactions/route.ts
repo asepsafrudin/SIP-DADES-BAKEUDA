@@ -128,14 +128,11 @@ export async function POST(req: NextRequest) {
         ID.unique(),
         {
           desa_id: desaId,
-          pagu: paguId,
           pagu_id: paguId,
           tahap_ke: "Rekomendasi Scanner", 
           nominal_pengajuan: item.nominal,
-          nominal_net: item.nominal,
           nominal_pencairan_net: item.nominal,
           keterangan: item.kegiatan,
-          status: "DRAFT",
           status_verifikasi: "DRAFT",
           no_rekomendasi: no_surat || ''
         }
@@ -185,10 +182,11 @@ export async function PATCH(req: NextRequest) {
   if (!auth.authorized) return auth.response!;
 
   try {
-    const { id, status } = await req.json();
+    const { id, status_verifikasi } = await req.json();
+    const status = status_verifikasi;
 
     if (!id || !status) {
-      return NextResponse.json({ error: 'ID transaksi dan status baru wajib dikirim.' }, { status: 400 });
+      return NextResponse.json({ error: 'ID transaksi dan status_verifikasi baru wajib dikirim.' }, { status: 400 });
     }
 
     if (status !== 'DISETUJUI' && status !== 'DITOLAK' && status !== 'DRAFT') {
@@ -238,7 +236,7 @@ export async function PATCH(req: NextRequest) {
         DB_ID,
         {
           $id: doc.$id,
-          desa_id: doc.desa_id || doc.desa,
+          desa_id: doc.desa_id,
           jenis_dana: doc.jenis_dana || 'ADD',
           bulan_penyaluran: doc.bulan_penyaluran || 'Agustus 2026',
           tahap_ke: doc.tahap_ke || 'Rekomendasi Scanner',
@@ -264,7 +262,6 @@ export async function PATCH(req: NextRequest) {
 
     // 3. Update status transaksi di database
     const updatedDoc = await databases.updateDocument(DB_ID, 'transaksi_pencairan', id, {
-      status: status,
       status_verifikasi: status
     });
 

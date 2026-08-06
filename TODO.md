@@ -87,3 +87,47 @@ Tracking eksekusi tugas berdasarkan `ROADMAP.md` (Post-Audit Revisi 2).
   - [x] Verifikasi TypeScript compile bersih (0 error)
   - ✅ **Sudah dieksekusi 2026-08-05:** Koleksi `admin_settings` dan dokumen `kill_switch_state` berhasil dibuat di Appwrite DB (`sipdades_db`).
   - ℹ️  Script setup tersedia di `scripts/setup-admin-settings.js` (jalankan dengan `node scripts/setup-admin-settings.js` jika perlu reset)
+
+---
+
+## 🔴 Fase 6: Sprint 1 — FONDASI & KEAMANAN (Revisi ke-3) — ✅ COMPLETED
+- [x] **Task 6.1: Fix Kill-Switch — FAIL CLOSED (Sprint 1, Hari 1)**
+  - [x] Implementasi block AI path: return HTTP 503 jika `killSwitch.active === true` di `src/app/api/ocr/route.ts`
+  - [x] Integrasikan error code `AI_KILLSWITCH_ACTIVE` di UI frontend untuk menampilkan form input manual
+  - [x] Pastikan tidak ada panggilan ke RunPod atau Local OCR saat kill-switch aktif
+- [x] **Task 6.2: Integrasi `recordAiUsage()` di OCR Pipeline (Sprint 1, Hari 1–2)**
+  - [x] Panggil `recordAiUsage()` setelah polling RunPod sukses di `src/app/api/ocr/route.ts`
+  - [x] Tampilkan akumulasi biaya pemakaian real-time pada dashboard billing
+  - [x] Aktifkan kill-switch otomatis jika `monthlyUsageCostUsd >= monthlyBudgetLimitUsd`
+- [x] **Task 6.3: Hapus Hardcode "PANICAN" — Ganti Validasi Data Nyata (Sprint 1, Hari 2–3)**
+  - [x] Hapus string literal nama desa di `src/lib/validations/ruleEvaluator.ts`
+  - [x] Ambil `status_pbb_lunas` dari `master_desa` untuk validasi BHPR Tahap II
+  - [x] Terapkan fail-safe: tolak transaksi jika data status PBB tidak ditemukan
+- [x] **Task 6.4: Fix Schema Drift — Satu Sumber Kebenaran (Sprint 1, Hari 3–5)**
+  - [x] Standardisasi nama atribut: `status_verifikasi` (bukan `status`), `nominal_pencairan_net` (bukan `nominal_net`), `desa_id` (bukan `desa`)
+  - [x] Buat dan jalankan script audit otomatis pre-commit atau CI check untuk mendeteksi alias terlarang
+  - [x] Update seluruh referensi di `ruleEvaluator.ts`, `/api/transactions`, `/api/kuitansi`, `/api/add/rekap-spm`, setup scripts, dan komponen frontend
+- [x] **Task 6.5: MCP Client — Env Variable & Resilience (Sprint 1, Hari 5–6)**
+  - [x] Baca URL MCP dari `process.env.MCP_SERVER_URL` di `src/lib/mcpClient.ts`
+  - [x] Implementasikan retry 3x dengan exponential backoff dan timeout 15 detik untuk panggilan tool MCP
+- [x] **Task 6.6: Rate Limit — Distributed (Sprint 1, Hari 6–7)**
+  - [x] Implementasikan distributed rate limit menggunakan Appwrite collection `rate_limit` di `src/utils/rateLimitDistributed.ts`
+  - [x] Bersihkan entri request lama dan batasi request per window
+  - [x] Pastikan system fail-open (tetap layani request) jika Appwrite rate limit error
+
+---
+
+## 🟡 Fase 7: Sprint 2 — AI AGENTIC & RAG (Revisi ke-3) — ⏳ PENDING
+- [ ] **Task 7.1: RAG Pipeline Minimal — Ingest 3 Dokumen Kritis (Sprint 2, Hari 8–10)**
+  - [ ] Buat script ingestion `scripts/rag-ingest.ts` dan client `src/lib/ragClient.ts`
+  - [ ] Ingest 3 dokumen kritis ke PostgreSQL + pgvector (namespace `purbalingga_legal`)
+- [ ] **Task 7.2: AI Policy Compiler — Integrasi RAG Context (Sprint 2, Hari 10–12)**
+  - [ ] Ambil konteks dari RAG sebelum memanggil Gemini di `/api/regulasi/extract-rules`
+  - [ ] Pastikan fallback ke Gemini biasa tanpa konteks jika RAG offline
+- [ ] **Task 7.3: Human-in-the-Loop UI — Approval Dashboard (Sprint 2, Hari 12–14)**
+  - [ ] Buat halaman dashboard approval di `src/app/admin/regulasi-approval/page.tsx`
+  - [ ] Catat log persetujuan ke `AUDIT_LOG_REGULASI`
+  - [ ] Pastikan regulasi baru tidak aktif di production tanpa persetujuan eksplisit
+- [ ] **Task 7.4: Regression Test Suite — 1000+ Transaksi Historis (Sprint 2, Hari 13–14)**
+  - [ ] Buat unit test `tests/regression/transaction-rules.test.ts` dengan minimal 10 test case otomatis
+  - [ ] Integrasikan test ini ke CI pipeline

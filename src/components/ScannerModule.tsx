@@ -34,6 +34,23 @@ export default function ScannerModule() {
   const [selectedSumberDana, setSelectedSumberDana] = useState('');
   const [tahun, setTahun] = useState('2026');
   const [saveReport, setSaveReport] = useState<SaveReport | null>(null);
+  const [isAiDisabled, setIsAiDisabled] = useState(false);
+  const [aiDisabledReason, setAiDisabledReason] = useState('');
+
+  const handleManualInput = () => {
+    setIsAiDisabled(false);
+    setError(null);
+    setResults([
+      { nama_desa: '', kegiatan: '', nominal: 0, no_rekening: '' }
+    ]);
+  };
+
+  const handleAddRow = () => {
+    setResults(prev => [
+      ...prev,
+      { nama_desa: '', kegiatan: '', nominal: 0, no_rekening: '' }
+    ]);
+  };
 
   useEffect(() => {
     const fetchSumberDana = async () => {
@@ -123,8 +140,16 @@ export default function ScannerModule() {
       });
 
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Gagal memproses dokumen');
+      if (!response.ok) {
+        if (data.code === 'AI_KILLSWITCH_ACTIVE') {
+          setIsAiDisabled(true);
+          setAiDisabledReason(data.reason || '');
+          throw new Error(`${data.error} Alasan: ${data.reason || '-'}. ${data.fallback}`);
+        }
+        throw new Error(data.error || 'Gagal memproses dokumen');
+      }
       
+      setIsAiDisabled(false);
       setResults(data.data);
 
       // Auto-Select Sumber Dana & Tahun dari Metadata AI
@@ -202,7 +227,7 @@ export default function ScannerModule() {
     }
   };
 
-  const handleEditRow = (index: number, field: string, value: string) => {
+  const handleEditRow = (index: number, field: string, value: any) => {
     setResults(prev => {
       const newData = [...prev];
       newData[index] = { ...newData[index], [field]: value };
@@ -234,8 +259,16 @@ export default function ScannerModule() {
       </div>
 
       {error && (
-        <div className="mt-6 p-4 bg-red-100 text-red-800 rounded-lg text-sm font-medium text-center">
-          {error}
+        <div className="mt-6 p-4 bg-red-100 text-red-800 rounded-lg text-sm font-medium text-center flex flex-col items-center justify-center gap-3">
+          <p>{error}</p>
+          {isAiDisabled && (
+            <button
+              onClick={handleManualInput}
+              className="px-4 py-2 bg-red-800 text-white font-semibold rounded-lg hover:bg-red-900 transition-colors shadow-sm text-xs font-semibold"
+            >
+              ✍️ Masukkan Data Secara Manual
+            </button>
+          )}
         </div>
       )}
 
@@ -306,6 +339,7 @@ export default function ScannerModule() {
                   <th className="px-4 py-3 font-medium">Kegiatan</th>
                   <th className="px-4 py-3 font-medium">Nominal</th>
                   <th className="px-4 py-3 font-medium">No Rekening</th>
+                  <th className="px-4 py-3 font-medium text-center w-12">Aksi</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-200 dark:divide-zinc-700 bg-white dark:bg-zinc-900">
@@ -316,29 +350,77 @@ export default function ScannerModule() {
                         type="text"
                         value={row.nama_desa}
                         onChange={(e) => handleEditRow(i, 'nama_desa', e.target.value)}
-                        title="Klik untuk mengedit secara manual jika ada salah ketik"
+                        title="Klik untuk mengedit nama desa secara manual"
                         disabled={saving}
                         className="w-full bg-transparent border-b border-transparent hover:border-zinc-300 focus:border-blue-500 focus:outline-none focus:bg-white dark:focus:bg-zinc-800 px-2 py-1 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        placeholder="Nama Desa"
                       />
                     </td>
-                    <td className="px-4 py-3 text-zinc-500">{row.kegiatan}</td>
-                    <td className="px-4 py-3 font-semibold text-green-600">
-                      {new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR' }).format(row.nominal)}
+                    <td className="px-2 py-2 text-zinc-500">
+                      <input 
+                        type="text"
+                        value={row.kegiatan}
+                        onChange={(e) => handleEditRow(i, 'kegiatan', e.target.value)}
+                        title="Klik untuk mengedit keterangan kegiatan secara manual"
+                        disabled={saving}
+                        className="w-full bg-transparent border-b border-transparent hover:border-zinc-300 focus:border-blue-500 focus:outline-none focus:bg-white dark:focus:bg-zinc-800 px-2 py-1 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        placeholder="Keterangan Kegiatan"
+                      />
                     </td>
-                    <td className="px-4 py-3 text-zinc-500 font-mono">{row.no_rekening}</td>
+                    <td className="px-2 py-2 font-semibold text-green-600">
+                      <input 
+                        type="number"
+                        value={row.nominal}
+                        onChange={(e) => handleEditRow(i, 'nominal', Number(e.target.value) || 0)}
+                        title="Klik untuk mengedit nominal secara manual"
+                        disabled={saving}
+                        className="w-full bg-transparent border-b border-transparent hover:border-zinc-300 focus:border-blue-500 focus:outline-none focus:bg-white dark:focus:bg-zinc-800 px-2 py-1 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-green-600 font-semibold"
+                        placeholder="Nominal"
+                      />
+                    </td>
+                    <td className="px-2 py-2 text-zinc-500 font-mono">
+                      <input 
+                        type="text"
+                        value={row.no_rekening}
+                        onChange={(e) => handleEditRow(i, 'no_rekening', e.target.value)}
+                        title="Klik untuk mengedit no rekening secara manual"
+                        disabled={saving}
+                        className="w-full bg-transparent border-b border-transparent hover:border-zinc-300 focus:border-blue-500 focus:outline-none focus:bg-white dark:focus:bg-zinc-800 px-2 py-1 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-mono"
+                        placeholder="No Rekening"
+                      />
+                    </td>
+                    <td className="px-2 py-2 text-center">
+                      <button
+                        onClick={() => setResults(prev => prev.filter((_, idx) => idx !== i))}
+                        disabled={saving}
+                        className="p-1 text-red-500 hover:text-red-700 transition-colors disabled:opacity-50"
+                        title="Hapus baris"
+                      >
+                        <svg className="w-5 h-5 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-          <button 
-            onClick={handleSaveToAppwrite}
-            disabled={saving || !selectedSumberDana}
-            className="w-full py-3 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center"
-          >
-            {saving && <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>}
-            {saving ? 'Sedang Menyimpan ke Database...' : 'Konfirmasi & Simpan Transaksi ke Appwrite'}
-          </button>
+          <div className="flex flex-col sm:flex-row gap-4">
+            <button 
+              onClick={handleAddRow}
+              disabled={saving}
+              className="py-3 px-6 bg-zinc-200 hover:bg-zinc-300 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 font-semibold rounded-lg transition-colors flex justify-center items-center gap-2"
+            >
+              ➕ Tambah Baris
+            </button>
+            <button 
+              onClick={handleSaveToAppwrite}
+              disabled={saving || !selectedSumberDana}
+              className="flex-1 py-3 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center"
+            >
+              {saving && <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>}
+              {saving ? 'Sedang Menyimpan ke Database...' : 'Konfirmasi & Simpan Transaksi ke Appwrite'}
+            </button>
+          </div>
         </div>
       )}
     </div>

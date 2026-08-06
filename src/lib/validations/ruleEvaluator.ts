@@ -171,10 +171,16 @@ export async function validateTransaction(
   if (jenis_dana === 'BHPR') {
     // Syarat Tahap II (40%): Setoran PBB-P2 Wajib 100% Lunas
     if (tahap_ke.toLowerCase().includes('tahap ii') || tahap_ke.toLowerCase().includes('tahap 2')) {
-      // Simulasi Pemeriksaan Lunas Pajak: Blokir desa PANICAN sebagai simulasi belum lunas
-      if (namaDesa.toUpperCase().includes('PANICAN')) {
-        errors.push(`Pencairan BHPR Tahap II untuk Desa PANICAN ditunda karena setoran Pajak Bumi dan Bangunan (PBB-P2) desa belum lunas 100%.`);
-        pasalRujukan.push('Pasal 8 Perbup No. 9 Tahun 2025 (Penyaluran Tahap II BHPR)');
+      try {
+        const desaDoc = await databases.getDocument(dbId, 'master_desa', desa_id);
+        const statusPbb = desaDoc.status_pbb_lunas;
+        if (statusPbb !== true && statusPbb !== 'LUNAS') {
+          errors.push(`Pencairan BHPR Tahap II untuk Desa ${namaDesa} ditunda karena setoran Pajak Bumi dan Bangunan (PBB-P2) desa belum lunas 100%.`);
+          pasalRujukan.push('Pasal 8 Perbup No. 9 Tahun 2025 (Penyaluran Tahap II BHPR)');
+        }
+      } catch (err) {
+        errors.push(`Tidak dapat memverifikasi status PBB-P2 untuk Desa ${namaDesa}. Pencairan ditunda.`);
+        pasalRujukan.push('Pasal 8 Perbup No. 9 Tahun 2025');
       }
     }
   }

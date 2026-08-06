@@ -14,31 +14,37 @@ export default function DashboardAddPage() {
   const handleUploadOCR = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0) return;
     setIsUploadingOCR(true);
-    try {
-      const file = e.target.files[0];
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = async () => {
+    const file = e.target.files[0];
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = async () => {
+      try {
         const base64 = reader.result as string;
         
-        // Simulating the OCR API call
         const response = await fetch('/api/ocr', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ images: [base64] })
         });
         
-        if (!response.ok) throw new Error('OCR Failed');
-        // Trigger refetch or handle success
+        const data = await response.json();
+        if (!response.ok) {
+          if (data.code === 'AI_KILLSWITCH_ACTIVE') {
+            alert(`Layanan AI OCR dinonaktifkan.\nAlasan: ${data.reason || '-'}\n\n${data.fallback}`);
+            return;
+          }
+          throw new Error(data.error || 'Gagal memproses dokumen');
+        }
+        
         alert('File berhasil diunggah dan sedang diproses oleh OCR.');
         refetch();
-      };
-    } catch (err) {
-      alert('Gagal mengunggah dokumen.');
-    } finally {
-      setIsUploadingOCR(false);
-      e.target.value = '';
-    }
+      } catch (err: any) {
+        alert(err.message || 'Gagal mengunggah dokumen.');
+      } finally {
+        setIsUploadingOCR(false);
+        e.target.value = '';
+      }
+    };
   };
 
   const handleUploadBPJS = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -160,18 +166,18 @@ export default function DashboardAddPage() {
                       <td className="px-6 py-4 font-medium text-slate-800">{row.desa_id}</td>
                       <td className="px-6 py-4">
                         <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${
-                          row.status === 'DISETUJUI' ? 'bg-green-100 text-green-700' :
-                          row.status === 'DITOLAK' ? 'bg-red-100 text-red-700' :
+                          row.status_verifikasi === 'DISETUJUI' ? 'bg-green-100 text-green-700' :
+                          row.status_verifikasi === 'DITOLAK' ? 'bg-red-100 text-red-700' :
                           'bg-amber-100 text-amber-700'
                         }`}>
-                          {row.status}
+                          {row.status_verifikasi}
                         </span>
                       </td>
                       <td className="px-6 py-4">{row.nominal_pengajuan?.toLocaleString('id-ID') || 0}</td>
                       <td className="px-6 py-4 text-red-500">{row.potongan_bpjs?.toLocaleString('id-ID') || 0}</td>
-                      <td className="px-6 py-4 font-semibold text-slate-800">{row.nominal_net?.toLocaleString('id-ID') || 0}</td>
+                      <td className="px-6 py-4 font-semibold text-slate-800">{row.nominal_pencairan_net?.toLocaleString('id-ID') || 0}</td>
                       <td className="px-6 py-4 text-center">
-                        {row.status !== 'DISETUJUI' && (
+                        {row.status_verifikasi !== 'DISETUJUI' && (
                           <button 
                             onClick={async () => {
                               try {

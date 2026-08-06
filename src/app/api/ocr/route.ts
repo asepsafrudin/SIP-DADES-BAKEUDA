@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
   const ip = req.headers.get('x-forwarded-for') ?? 'unknown';
   
   // Rate Limit: 5 requests per minute
-  const limit = rateLimit(ip, 5, 60 * 1000);
+  const limit = await rateLimit(ip, 5, 60 * 1000);
   if (!limit.success) {
     logger.warn('OCR_API', 'Rate limit exceeded', { ip });
     return NextResponse.json({ error: 'Terlalu banyak permintaan. Silakan coba beberapa saat lagi.' }, { status: 429 });
@@ -42,7 +42,13 @@ export async function POST(req: NextRequest) {
     // Check AI Kill-Switch Status
     const killSwitch = await getKillSwitchState();
     if (killSwitch.active) {
-      logger.warn('OCR_API', 'AI Kill-Switch AKTIF - Melakukan fallback ke PDFParse lokal', { reason: killSwitch.reason });
+      logger.warn('OCR_API', 'AI Kill-Switch AKTIF — Blocking AI path', { reason: killSwitch.reason });
+      return NextResponse.json({
+        error: 'Layanan AI OCR sementara dinonaktifkan oleh administrator.',
+        reason: killSwitch.reason,
+        fallback: 'Silakan input data manual melalui form Draft Transaksi.',
+        code: 'AI_KILLSWITCH_ACTIVE'
+      }, { status: 503 });
     }
 
     // Check if it's a PDF
@@ -178,6 +184,12 @@ export async function POST(req: NextRequest) {
       const errorMsg = result.error || result.output?.error || 'Pemrosesan AI gagal di RunPod';
       return NextResponse.json({ error: errorMsg }, { status: 500 });
     }
+
+    // Record AI usage cost
+    const imageSizeMB = Buffer.from(base64Data, 'base64').length / (1024 * 1024);
+    const estimatedCost = imageSizeMB * 0.005;
+    await recordAiUsage(estimatedCost);
+    logger.info('OCR_API', 'AI usage recorded', { costUsd: estimatedCost });
 
     // handler.py mengembalikan: { status, raw_text, data: { metadata_sumber_dana, metadata_tahun_anggaran, metadata_no_surat, data[] } }
     const output = result.output;

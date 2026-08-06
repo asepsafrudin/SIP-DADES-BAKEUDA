@@ -34,10 +34,10 @@ export async function GET(request: NextRequest) {
 
     const formattedData = bkkDocs.map(doc => ({
       id: doc.$id,
-      desa: desaMap.get(doc.desa_id || doc.desa) || doc.desa_id || 'Tidak Diketahui',
+      desa: desaMap.get(doc.desa_id) || doc.desa_id || 'Tidak Diketahui',
       kegiatan: doc.keterangan || 'Pembangunan Sarpras Desa',
       nominal_rekomendasi: doc.nominal_pengajuan || doc.nominal_pencairan_net || 0,
-      status: doc.status_verifikasi || doc.status || 'DRAFT'
+      status_verifikasi: doc.status_verifikasi || 'DRAFT'
     }));
 
     const totalNominal = formattedData.reduce((s, r) => s + r.nominal_rekomendasi, 0);

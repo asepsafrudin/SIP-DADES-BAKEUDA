@@ -8,7 +8,7 @@ interface BkkRow {
   desa: string;
   kegiatan: string;
   nominal_rekomendasi: number;
-  status: string;
+  status_verifikasi: string;
 }
 
 export default function BkkPage() {
@@ -164,7 +164,7 @@ export default function BkkPage() {
                       <td className="font-semibold text-emerald-600">
                         {new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(row.nominal_rekomendasi)}
                       </td>
-                      <td><span className="badge badge-success">{row.status}</span></td>
+                      <td><span className="badge badge-success">{row.status_verifikasi}</span></td>
                       <td className="text-center">
                         <button
                           onClick={() => window.open(`/api/print/generate-spm?desa=${encodeURIComponent(row.desa)}&bulan=BKK+Sarpras+2026&nominal=${row.nominal_rekomendasi}`, '_blank')}

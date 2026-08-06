@@ -11,8 +11,8 @@ export interface Transaction {
   bulan_penyaluran: string;
   nominal_pengajuan: number;
   potongan_bpjs: number;
-  nominal_net: number;
-  status: string;
+  nominal_pencairan_net: number;
+  status_verifikasi: string;
   hasil_ocr?: string;
 }
 
@@ -54,7 +54,7 @@ export function useAddTransactions(bulan: string) {
       const response = await fetch('/api/transactions', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, status: newStatus })
+        body: JSON.stringify({ id, status_verifikasi: newStatus })
       });
       
       const resData = await response.json();
