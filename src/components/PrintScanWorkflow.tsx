@@ -23,12 +23,16 @@ export default function PrintScanWorkflow({
   const [isUploading, setIsUploading] = useState(false);
 
   const handlePrint = () => {
-    window.open(
-      `/api/print/generate-spm?desa=${encodeURIComponent(
-        desaName
-      )}&bulan=${encodeURIComponent(bulan)}&nominal=${nominal}`,
-      '_blank'
-    );
+    try {
+      window.open(
+        `/api/print/generate-spm?desa=${encodeURIComponent(
+          desaName
+        )}&bulan=${encodeURIComponent(bulan)}&nominal=${nominal}`,
+        '_blank'
+      );
+    } catch (err) {
+      console.warn('window.open blocked or failed in this environment', err);
+    }
     const nextStatus = 'MENUNGGU_TTE';
     setStatus(nextStatus);
     if (onStatusChange) onStatusChange(nextStatus);
